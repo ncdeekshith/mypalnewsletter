@@ -24,8 +24,11 @@ export type NewsletterIssue = {
   month: string;
   year: number;
   date: string;
+  dueDate?: string;
   issueNumber: string;
   status: "draft" | "published";
+  ownerId?: string;
+  notes?: string;
 };
 
 export type SubmissionImage = {

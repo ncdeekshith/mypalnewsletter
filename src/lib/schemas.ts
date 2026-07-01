@@ -54,3 +54,16 @@ export const userSchema = z.object({
   role: z.enum(["admin", "contributor"]),
   departmentId: z.string().optional()
 });
+
+export const issueSchema = z.object({
+  id: z.string(),
+  title: z.string().min(2),
+  month: z.string().min(2),
+  year: z.number().int().min(2020),
+  date: z.string().min(8),
+  dueDate: z.string().optional(),
+  issueNumber: z.string().min(1),
+  status: z.enum(["draft", "published"]),
+  ownerId: z.string().optional(),
+  notes: z.string().optional()
+});

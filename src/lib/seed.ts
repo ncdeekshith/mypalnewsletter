@@ -59,9 +59,10 @@ export const seedDatabase: NewsletterDatabase = {
       month: "June",
       year: 2026,
       date: "2026-06-30",
-      issueNumber: "06"
-    ,
-      status: "draft"
+      dueDate: "2026-06-25",
+      issueNumber: "06",
+      status: "draft",
+      notes: "Final copy lock by EOD. Export only after all required departments are approved."
     }
   ],
   settings: {

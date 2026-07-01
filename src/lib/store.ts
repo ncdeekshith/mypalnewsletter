@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
 import { seedDatabase } from "@/lib/seed";
-import type { AdminSettings, AppUser, GeneratedPdf, NewsletterDatabase, Submission, SubmissionImage } from "@/lib/types";
+import type { AdminSettings, AppUser, GeneratedPdf, NewsletterDatabase, NewsletterIssue, Submission, SubmissionImage } from "@/lib/types";
 
 const dataDir = path.join(process.cwd(), "data");
 const dataPath = path.join(dataDir, "newsletter-db.json");
@@ -118,4 +118,16 @@ export async function createUser(input: Omit<AppUser, "id">) {
   await writeDatabase(database);
   const { password: _password, ...safeUser } = user;
   return safeUser;
+}
+
+export async function updateIssue(input: NewsletterIssue) {
+  const database = await readDatabase();
+  const index = database.issues.findIndex((issue) => issue.id === input.id);
+  if (index === -1) {
+    throw new Error("Newsletter issue not found.");
+  }
+
+  database.issues[index] = input;
+  await writeDatabase(database);
+  return input;
 }
