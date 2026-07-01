@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { userSchema } from "@/lib/schemas";
 import { createUser, readDatabase } from "@/lib/store";
+import { sendMail } from "@/lib/mailer";
 
 export async function GET() {
   const database = await readDatabase();
@@ -19,6 +20,11 @@ export async function POST(request: Request) {
 
   try {
     const user = await createUser(parsed.data);
+    await sendMail({
+      to: parsed.data.email,
+      subject: "Your myPAL Newsletter Studio account is ready",
+      body: `Hi ${parsed.data.name},\n\nYour myPAL Newsletter Studio account has been created.\n\nLogin email: ${parsed.data.email}\nRole: ${parsed.data.role}\n\nPlease sign in and submit your monthly update before the issue deadline.\n\n- myPAL Newsletter Team`
+    });
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

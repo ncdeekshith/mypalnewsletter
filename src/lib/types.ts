@@ -8,6 +8,9 @@ export type AppUser = {
   password?: string;
   role: Role;
   departmentId?: string;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Department = {
@@ -101,6 +104,27 @@ export type GeneratedPdf = {
   createdAt: string;
 };
 
+export type AppNotification = {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  type: "submission" | "review" | "reminder" | "system";
+  read: boolean;
+  createdAt: string;
+};
+
+export type EmailOutboxItem = {
+  id: string;
+  to: string;
+  subject: string;
+  body: string;
+  status: "queued" | "sent" | "failed";
+  provider?: string;
+  error?: string;
+  createdAt: string;
+};
+
 export type NewsletterDatabase = {
   users: AppUser[];
   departments: Department[];
@@ -108,4 +132,6 @@ export type NewsletterDatabase = {
   submissions: Submission[];
   settings: AdminSettings;
   generatedPdfs: GeneratedPdf[];
+  notifications: AppNotification[];
+  emailOutbox: EmailOutboxItem[];
 };

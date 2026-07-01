@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { seedDatabase } from "@/lib/seed";
 import { firebaseEnabled } from "@/lib/firebase";
 import { readFirebaseDatabase, writeFirebaseDatabase } from "@/lib/firebase-store";
-import type { AdminSettings, AppUser, GeneratedPdf, NewsletterDatabase, NewsletterIssue, Submission, SubmissionImage } from "@/lib/types";
+import type { AdminSettings, AppNotification, AppUser, EmailOutboxItem, GeneratedPdf, NewsletterDatabase, NewsletterIssue, Submission, SubmissionImage } from "@/lib/types";
 
 const dataDir = path.join(process.cwd(), "data");
 const dataPath = path.join(dataDir, "newsletter-db.json");
@@ -19,9 +19,11 @@ async function ensureStore() {
 }
 
 export async function readDatabase(): Promise<NewsletterDatabase> {
+  let database: NewsletterDatabase;
   if (firebaseEnabled()) {
     try {
-      return await readFirebaseDatabase();
+      database = await readFirebaseDatabase();
+      return normalizeDatabase(database);
     } catch (error) {
       console.warn("Firebase read failed; falling back to local store.", error);
     }
@@ -35,10 +37,10 @@ export async function readDatabase(): Promise<NewsletterDatabase> {
   }
 
   try {
-    return JSON.parse(raw) as NewsletterDatabase;
+    return normalizeDatabase(JSON.parse(raw) as NewsletterDatabase);
   } catch {
     await writeDatabase(seedDatabase);
-    return seedDatabase;
+    return normalizeDatabase(seedDatabase);
   }
 }
 
@@ -130,13 +132,55 @@ export async function createUser(input: Omit<AppUser, "id">) {
 
   const user: AppUser = {
     ...input,
-    id: nanoid()
+    id: nanoid(),
+    active: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
   database.users.push(user);
   await writeDatabase(database);
   const { password: _password, ...safeUser } = user;
   return safeUser;
+}
+
+export async function updateUser(id: string, input: Partial<Omit<AppUser, "id">>) {
+  const database = await readDatabase();
+  const index = database.users.findIndex((user) => user.id === id);
+  if (index === -1) throw new Error("User not found.");
+
+  if (
+    input.email &&
+    database.users.some((user) => user.id !== id && user.email.toLowerCase() === input.email?.toLowerCase())
+  ) {
+    throw new Error("A user with this email already exists.");
+  }
+
+  const current = database.users[index];
+  database.users[index] = {
+    ...current,
+    ...input,
+    password: input.password || current.password,
+    active: input.active ?? current.active ?? true,
+    updatedAt: new Date().toISOString()
+  };
+
+  await writeDatabase(database);
+  const { password: _password, ...safeUser } = database.users[index];
+  return safeUser;
+}
+
+export async function deleteUser(id: string) {
+  const database = await readDatabase();
+  const admins = database.users.filter((user) => user.role === "admin" && user.active !== false);
+  const user = database.users.find((item) => item.id === id);
+  if (!user) throw new Error("User not found.");
+  if (user.role === "admin" && admins.length <= 1) throw new Error("Keep at least one active admin.");
+
+  database.users = database.users.filter((item) => item.id !== id);
+  database.submissions = database.submissions.filter((submission) => submission.userId !== id);
+  database.notifications = database.notifications.filter((notification) => notification.userId !== id);
+  await writeDatabase(database);
 }
 
 export async function updateIssue(input: NewsletterIssue) {
@@ -149,4 +193,55 @@ export async function updateIssue(input: NewsletterIssue) {
   database.issues[index] = input;
   await writeDatabase(database);
   return input;
+}
+
+export async function addNotification(input: Omit<AppNotification, "id" | "read" | "createdAt">) {
+  const database = await readDatabase();
+  const notification: AppNotification = {
+    ...input,
+    id: nanoid(),
+    read: false,
+    createdAt: new Date().toISOString()
+  };
+  database.notifications.unshift(notification);
+  await writeDatabase(database);
+  return notification;
+}
+
+export async function queueEmail(input: Omit<EmailOutboxItem, "id" | "status" | "createdAt"> & { status?: EmailOutboxItem["status"] }) {
+  const database = await readDatabase();
+  const item: EmailOutboxItem = {
+    ...input,
+    id: nanoid(),
+    status: input.status ?? "queued",
+    createdAt: new Date().toISOString()
+  };
+  database.emailOutbox.unshift(item);
+  await writeDatabase(database);
+  return item;
+}
+
+export async function markNotificationRead(id: string, userId: string) {
+  const database = await readDatabase();
+  const notification = database.notifications.find((item) => item.id === id && item.userId === userId);
+  if (!notification) throw new Error("Notification not found.");
+  notification.read = true;
+  await writeDatabase(database);
+  return notification;
+}
+
+function normalizeDatabase(database: NewsletterDatabase): NewsletterDatabase {
+  const users = (database.users ?? seedDatabase.users).map((user) => ({ ...user, active: user.active ?? true }));
+  const mainAdmin = seedDatabase.users.find((user) => user.email === "deekshith.nc@arivulearn.com");
+  if (mainAdmin && !users.some((user) => user.email.toLowerCase() === mainAdmin.email.toLowerCase())) {
+    users.unshift({ ...mainAdmin, active: true });
+  }
+
+  return {
+    ...seedDatabase,
+    ...database,
+    users,
+    notifications: database.notifications ?? [],
+    emailOutbox: database.emailOutbox ?? []
+  };
 }

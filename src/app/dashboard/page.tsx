@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  Bell,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -13,10 +14,14 @@ import {
   LayoutDashboard,
   LogOut,
   Palette,
+  Pencil,
   Plus,
   Save,
+  Send,
   Settings,
+  ShieldCheck,
   Sparkles,
+  Trash2,
   UploadCloud,
   UserPlus,
   Users,
@@ -25,7 +30,7 @@ import {
 import { useRouter } from "next/navigation";
 import { NewsletterPreview } from "@/components/newsletter-preview";
 import { StatusBadge } from "@/components/status-badge";
-import type { AdminSettings, AppUser, Department, NewsletterIssue, Submission, SubmissionImage, SubmissionStatus } from "@/lib/types";
+import type { AdminSettings, AppNotification, AppUser, Department, EmailOutboxItem, NewsletterIssue, Submission, SubmissionImage, SubmissionStatus } from "@/lib/types";
 
 type Bootstrap = {
   departments: Department[];
@@ -33,6 +38,8 @@ type Bootstrap = {
   settings: AdminSettings;
   generatedPdfs: { id: string; fileName: string; fileUrl: string; createdAt: string }[];
   users: AppUser[];
+  notifications: AppNotification[];
+  emailOutbox: EmailOutboxItem[];
 };
 
 type Tab = "submit" | "review" | "design" | "planner" | "accounts" | "settings";
@@ -136,19 +143,24 @@ export default function DashboardPage() {
   }
 
   const admin = user.role === "admin";
+  const userNotifications = bootstrap.notifications.filter((notification) => notification.userId === user.id);
+  const unreadCount = userNotifications.filter((notification) => !notification.read).length;
 
   return (
-    <main className="min-h-screen bg-[#fff7f0] text-[#2a211d]">
-      <header className="sticky top-0 z-20 border-b border-orange-100 bg-white/95 px-5 py-4 backdrop-blur">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#ffe2cd_0,#fff7f0_34%,#fff_100%)] text-[#2a211d]">
+      <header className="sticky top-0 z-20 border-b border-orange-100 bg-white/90 px-5 py-4 shadow-[0_18px_60px_rgba(97,48,17,0.07)] backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="rounded bg-mypal-orange px-4 py-2 text-xl font-black text-white shadow-[0_10px_24px_rgba(244,123,32,0.25)]">myPAL</div>
             <div>
-              <h1 className="text-xl font-black text-[#2a211d]">Newsletter Studio</h1>
-              <p className="text-sm text-orange-700">{issue.month} {issue.year} • Issue {issue.issueNumber}</p>
+              <h1 className="text-xl font-black text-[#2a211d]">Newsletter Operations Studio</h1>
+              <p className="text-sm font-semibold text-orange-700">{issue.month} {issue.year} • Issue {issue.issueNumber}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-4 py-2 text-sm font-black text-orange-800 md:flex">
+              <Bell size={16} /> {unreadCount} unread
+            </div>
             <a href="/preview" target="_blank" className="hidden items-center gap-2 rounded border border-orange-200 bg-white px-4 py-2 text-sm font-bold text-[#2a211d] md:flex">
               <Eye size={16} /> Preview
             </a>
@@ -165,17 +177,18 @@ export default function DashboardPage() {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[280px_1fr]">
-        <aside className="h-fit rounded-lg border border-orange-100 bg-white p-3 shadow-soft">
+        <aside className="h-fit rounded-lg border border-orange-100 bg-[#2a211d] p-3 shadow-[0_24px_80px_rgba(42,33,29,0.18)]">
           <NavButton active={activeTab === "submit"} icon={<UploadCloud size={18} />} label="Add Monthly Update" onClick={() => setActiveTab("submit")} />
           {admin ? <NavButton active={activeTab === "review"} icon={<LayoutDashboard size={18} />} label="Review Workflow" onClick={() => setActiveTab("review")} /> : null}
           {admin ? <NavButton active={activeTab === "design"} icon={<Palette size={18} />} label="Design Studio" onClick={() => setActiveTab("design")} /> : null}
           {admin ? <NavButton active={activeTab === "planner"} icon={<CalendarDays size={18} />} label="Issue Planner" onClick={() => setActiveTab("planner")} /> : null}
           {admin ? <NavButton active={activeTab === "accounts"} icon={<Users size={18} />} label="Team Accounts" onClick={() => setActiveTab("accounts")} /> : null}
           {admin ? <NavButton active={activeTab === "settings"} icon={<Settings size={18} />} label="Brand Settings" onClick={() => setActiveTab("settings")} /> : null}
-          <div className="mt-4 rounded bg-orange-50 p-4 text-sm">
-            <p className="font-black text-[#2a211d]">{user.name}</p>
-            <p className="text-orange-700">{user.role === "admin" ? "Admin / Marketing Manager" : activeDepartment?.name}</p>
+          <div className="mt-4 rounded border border-white/10 bg-white/10 p-4 text-sm text-white">
+            <p className="font-black">{user.name}</p>
+            <p className="text-orange-100">{user.role === "admin" ? "Main Admin / Marketing Manager" : activeDepartment?.name}</p>
           </div>
+          <NotificationPanel notifications={userNotifications} userId={user.id} onUpdated={() => loadAll()} />
         </aside>
 
         <section>
@@ -190,7 +203,7 @@ export default function DashboardPage() {
             <DesignStudio issue={issue} settings={bootstrap.settings} submissions={submissions} onPatch={patchSubmission} onSettingsSaved={() => loadAll()} />
           ) : null}
           {activeTab === "planner" && admin ? (
-            <IssuePlanner issue={issue} users={bootstrap.users} submissions={submissions} departments={bootstrap.departments} onSaved={patchIssue} />
+            <IssuePlanner issue={issue} users={bootstrap.users} submissions={submissions} departments={bootstrap.departments} emailOutbox={bootstrap.emailOutbox} onSaved={patchIssue} onReminded={() => loadAll()} />
           ) : null}
           {activeTab === "accounts" && admin ? (
             <AccountsPanel users={bootstrap.users} departments={bootstrap.departments} onCreated={() => loadAll()} />
@@ -208,11 +221,43 @@ function NavButton({ active, icon, label, onClick }: { active: boolean; icon: Re
   return (
     <button
       onClick={onClick}
-      className={`mb-2 flex w-full items-center gap-3 rounded px-3 py-3 text-left text-sm font-bold transition ${active ? "bg-mypal-orange text-white shadow-[0_10px_24px_rgba(244,123,32,0.22)]" : "text-[#4a3930] hover:bg-orange-50"}`}
+      className={`mb-2 flex w-full items-center gap-3 rounded px-3 py-3 text-left text-sm font-bold transition ${active ? "bg-mypal-orange text-white shadow-[0_10px_24px_rgba(244,123,32,0.22)]" : "text-orange-50/85 hover:bg-white/10 hover:text-white"}`}
     >
       {icon}
       {label}
     </button>
+  );
+}
+
+function NotificationPanel({ notifications, userId, onUpdated }: { notifications: AppNotification[]; userId: string; onUpdated: () => Promise<void> }) {
+  async function markRead(id: string) {
+    await fetch(`/api/notifications/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId })
+    });
+    await onUpdated();
+  }
+
+  return (
+    <div className="mt-4 rounded border border-white/10 bg-white/10 p-4 text-white">
+      <div className="flex items-center gap-2">
+        <Bell size={16} className="text-mypal-orange" />
+        <p className="text-sm font-black">Notifications</p>
+      </div>
+      <div className="mt-3 max-h-64 space-y-2 overflow-auto pr-1">
+        {notifications.length ? notifications.slice(0, 6).map((notification) => (
+          <button
+            key={notification.id}
+            onClick={() => markRead(notification.id)}
+            className={`w-full rounded p-3 text-left text-xs leading-5 transition ${notification.read ? "bg-white/5 text-orange-50/70" : "bg-white text-[#2a211d] shadow-soft"}`}
+          >
+            <span className="block font-black">{notification.title}</span>
+            <span>{notification.body}</span>
+          </button>
+        )) : <p className="text-xs leading-5 text-orange-50/70">No alerts yet. Submission confirmations and reminders will appear here.</p>}
+      </div>
+    </div>
   );
 }
 
@@ -236,6 +281,8 @@ function SubmissionForm({
   const existing = submissions.find((item) => item.departmentId === departmentId);
   const [form, setForm] = useState(() => formFromSubmission(existing, selectedDepartment));
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [savingStatus, setSavingStatus] = useState<SubmissionStatus | null>(null);
 
   useEffect(() => {
     const nextDepartment = departments.find((item) => item.id === departmentId) ?? defaultDepartment;
@@ -246,6 +293,8 @@ function SubmissionForm({
   async function submit(event: FormEvent, status: SubmissionStatus) {
     event.preventDefault();
     setError("");
+    setSuccess("");
+    setSavingStatus(status);
     const payload = {
       id: form.id,
       issueId: issue.id,
@@ -270,12 +319,16 @@ function SubmissionForm({
     });
 
     if (!response.ok) {
-      setError("Please include an intro, 3 bullet points, and at least 4 photos with captions.");
+      const data = await response.json().catch(() => null);
+      setSavingStatus(null);
+      setError(formatSubmissionError(data) || "Please include an intro, 3 bullet points, and at least 4 photos with captions.");
       return;
     }
 
     const data = await response.json();
     setForm((current) => ({ ...current, id: data.submission.id, status: data.submission.status }));
+    setSuccess(status === "submitted" ? "Submitted for admin review. A confirmation notification and email have been queued." : "Draft saved.");
+    setSavingStatus(null);
     await onSaved();
   }
 
@@ -318,13 +371,14 @@ function SubmissionForm({
       </div>
 
       {error ? <p className="mt-4 rounded bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{error}</p> : null}
+      {success ? <p className="mt-4 rounded bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">{success}</p> : null}
 
       <div className="mt-7 flex flex-wrap gap-3">
-        <button onClick={(event) => submit(event, "draft")} className="flex items-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-[#2a211d]">
-          <Save size={18} /> Save Draft
+        <button type="button" disabled={Boolean(savingStatus)} onClick={(event) => submit(event, "draft")} className="flex items-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-[#2a211d] disabled:opacity-60">
+          <Save size={18} /> {savingStatus === "draft" ? "Saving..." : "Save Draft"}
         </button>
-        <button onClick={(event) => submit(event, "submitted")} className="flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white">
-          <UploadCloud size={18} /> Submit for Review
+        <button type="button" disabled={Boolean(savingStatus)} onClick={(event) => submit(event, "submitted")} className="flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white shadow-[0_14px_30px_rgba(244,123,32,0.28)] disabled:opacity-60">
+          <UploadCloud size={18} /> {savingStatus === "submitted" ? "Submitting..." : "Submit for Review"}
         </button>
       </div>
     </form>
@@ -546,12 +600,16 @@ function IssuePlanner({
   users,
   submissions,
   departments,
+  emailOutbox,
+  onReminded,
   onSaved
 }: {
   issue: NewsletterIssue;
   users: AppUser[];
   submissions: Submission[];
   departments: Department[];
+  emailOutbox: EmailOutboxItem[];
+  onReminded: () => Promise<void>;
   onSaved: (patch: Partial<NewsletterIssue>) => Promise<void>;
 }) {
   const [form, setForm] = useState({
@@ -566,6 +624,7 @@ function IssuePlanner({
     notes: issue.notes ?? ""
   });
   const readiness = getReadiness(issue, submissions, departments);
+  const [reminderMessage, setReminderMessage] = useState("");
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -574,6 +633,18 @@ function IssuePlanner({
       year: Number(form.year),
       status: form.status as NewsletterIssue["status"]
     });
+  }
+
+  async function sendReminders() {
+    setReminderMessage("Sending reminders...");
+    const response = await fetch("/api/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    const data = await response.json();
+    setReminderMessage(response.ok ? `Reminders queued for ${data.sent} contributor(s).` : "Could not send reminders.");
+    await onReminded();
   }
 
   return (
@@ -594,7 +665,11 @@ function IssuePlanner({
         </div>
         <SelectField label="Owner" value={form.ownerId} onChange={(value) => setForm({ ...form, ownerId: value })} options={[{ label: "Unassigned", value: "" }, ...users.filter((item) => item.role === "admin").map((item) => ({ label: item.name, value: item.id }))]} />
         <TextArea label="Internal production notes" value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} rows={5} />
-        <button className="mt-6 flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><Save size={18} /> Save Issue Plan</button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button className="flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><Save size={18} /> Save Issue Plan</button>
+          <button type="button" onClick={sendReminders} className="flex items-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-[#2a211d]"><Send size={18} /> Send Reminders</button>
+        </div>
+        {reminderMessage ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{reminderMessage}</p> : null}
       </form>
 
       <div className="space-y-6">
@@ -614,6 +689,20 @@ function IssuePlanner({
                 </div>
               );
             })}
+          </div>
+        </div>
+        <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+          <h2 className="text-2xl font-black text-[#2a211d]">Email Delivery Log</h2>
+          <div className="mt-4 grid gap-2">
+            {emailOutbox.length ? emailOutbox.slice(0, 6).map((email) => (
+              <div key={email.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-orange-100 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-black text-[#2a211d]">{email.subject}</p>
+                  <p className="text-slate-600">{email.to}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${email.status === "sent" ? "bg-emerald-50 text-emerald-700" : email.status === "failed" ? "bg-rose-50 text-rose-700" : "bg-orange-50 text-orange-700"}`}>{email.status}</span>
+              </div>
+            )) : <p className="text-sm text-slate-500">No emails queued yet.</p>}
           </div>
         </div>
       </div>
@@ -677,6 +766,8 @@ function DesignStudio({
 
 function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; departments: Department[]; onCreated: () => Promise<void> }) {
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic", active: true });
   const [message, setMessage] = useState("");
 
   async function createAccount(event: FormEvent) {
@@ -697,9 +788,56 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
     await onCreated();
   }
 
+  function startEdit(user: AppUser) {
+    setEditingId(user.id);
+    setEditForm({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      departmentId: user.departmentId ?? "academic",
+      active: user.active !== false
+    });
+  }
+
+  async function saveEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!editingId) return;
+    setMessage("");
+    const response = await fetch(`/api/users/${editingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...editForm,
+        password: editForm.password || undefined,
+        departmentId: editForm.role === "admin" ? undefined : editForm.departmentId
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.message ?? "Could not update account.");
+      return;
+    }
+    setEditingId(null);
+    setMessage("Account updated.");
+    await onCreated();
+  }
+
+  async function deleteAccount(id: string) {
+    setMessage("");
+    const response = await fetch(`/api/users/${id}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.message ?? "Could not delete account.");
+      return;
+    }
+    setMessage("Account deleted.");
+    await onCreated();
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
-      <form onSubmit={createAccount} className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+      <form onSubmit={createAccount} className="rounded-lg border border-orange-100 bg-white p-6 shadow-[0_24px_70px_rgba(97,48,17,0.09)]">
         <div className="flex items-center gap-2">
           <UserPlus className="text-mypal-orange" size={22} />
           <h2 className="text-2xl font-black text-[#2a211d]">Create Team Account</h2>
@@ -708,24 +846,51 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
         <Field label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
         <Field label="Password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} type="password" />
         <SelectField label="Role" value={form.role} onChange={(value) => setForm({ ...form, role: value })} options={[{ label: "Contributor", value: "contributor" }, { label: "Admin", value: "admin" }]} />
-        <SelectField label="Department" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={departments.filter((item) => departmentOptions.includes(item.id)).map((item) => ({ label: item.name, value: item.id }))} />
+        {form.role === "contributor" ? <SelectField label="Department" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={departments.filter((item) => departmentOptions.includes(item.id)).map((item) => ({ label: item.name, value: item.id }))} /> : null}
         {message ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{message}</p> : null}
         <button className="mt-6 flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><UserPlus size={18} /> Create Account</button>
       </form>
 
-      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
-        <h2 className="text-2xl font-black text-[#2a211d]">Team Directory</h2>
+      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-[0_24px_70px_rgba(97,48,17,0.09)]">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="text-mypal-orange" size={22} />
+          <h2 className="text-2xl font-black text-[#2a211d]">Team Access Console</h2>
+        </div>
         <div className="mt-4 grid gap-3">
           {users.map((item) => (
-            <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-orange-100 px-4 py-3">
-              <div>
-                <p className="font-black text-[#2a211d]">{item.name}</p>
-                <p className="text-sm text-slate-600">{item.email}</p>
-              </div>
-              <div className="text-right text-sm">
-                <p className="font-bold capitalize text-orange-700">{item.role}</p>
-                <p className="text-slate-500">{departmentName(departments, item.departmentId ?? "")}</p>
-              </div>
+            <div key={item.id} className="rounded border border-orange-100 px-4 py-3">
+              {editingId === item.id ? (
+                <form onSubmit={saveEdit} className="grid gap-3 md:grid-cols-2">
+                  <Field label="Name" value={editForm.name} onChange={(value) => setEditForm({ ...editForm, name: value })} />
+                  <Field label="Email" value={editForm.email} onChange={(value) => setEditForm({ ...editForm, email: value })} />
+                  <Field label="New password" value={editForm.password} onChange={(value) => setEditForm({ ...editForm, password: value })} type="password" />
+                  <SelectField label="Role" value={editForm.role} onChange={(value) => setEditForm({ ...editForm, role: value })} options={[{ label: "Contributor", value: "contributor" }, { label: "Admin", value: "admin" }]} />
+                  {editForm.role === "contributor" ? <SelectField label="Department" value={editForm.departmentId} onChange={(value) => setEditForm({ ...editForm, departmentId: value })} options={departments.filter((department) => departmentOptions.includes(department.id)).map((department) => ({ label: department.name, value: department.id }))} /> : null}
+                  <label className="mt-5 flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <input type="checkbox" checked={editForm.active} onChange={(event) => setEditForm({ ...editForm, active: event.target.checked })} />
+                    Active login
+                  </label>
+                  <div className="md:col-span-2 flex flex-wrap gap-2">
+                    <button className="rounded bg-mypal-orange px-4 py-2 text-sm font-bold text-white">Save changes</button>
+                    <button type="button" onClick={() => setEditingId(null)} className="rounded border border-orange-200 px-4 py-2 text-sm font-bold text-[#2a211d]">Cancel</button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black text-[#2a211d]">{item.name}</p>
+                    <p className="text-sm text-slate-600">{item.email}</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-right text-sm">
+                    <div>
+                      <p className="font-bold capitalize text-orange-700">{item.role}{item.active === false ? " · inactive" : ""}</p>
+                      <p className="text-slate-500">{item.role === "admin" ? "All admin tools" : departmentName(departments, item.departmentId ?? "")}</p>
+                    </div>
+                    <button onClick={() => startEdit(item)} className="rounded border border-orange-200 p-2 text-orange-700" aria-label="Edit user"><Pencil size={16} /></button>
+                    <button onClick={() => deleteAccount(item.id)} className="rounded border border-rose-200 p-2 text-rose-700" aria-label="Delete user"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -874,6 +1039,16 @@ function formFromSubmission(submission: Submission | undefined, department: Depa
     status: submission?.status ?? "draft",
     reviewerNote: submission?.reviewerNote ?? ""
   };
+}
+
+function formatSubmissionError(data: unknown) {
+  if (!data || typeof data !== "object" || !("errors" in data)) return "";
+  const errors = (data as { errors?: { fieldErrors?: Record<string, string[]>; formErrors?: string[] } }).errors;
+  const fieldErrors = errors?.fieldErrors ?? {};
+  return Object.entries(fieldErrors)
+    .flatMap(([field, messages]) => messages.map((message) => `${field}: ${message}`))
+    .concat(errors?.formErrors ?? [])
+    .join(" ");
 }
 
 function metricFromLine(item: string) {

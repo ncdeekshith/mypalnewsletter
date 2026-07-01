@@ -8,6 +8,8 @@ export async function GET() {
     issues: database.issues,
     settings: database.settings,
     generatedPdfs: database.generatedPdfs,
-    users: database.users.map(({ password: _password, ...user }) => user)
+    users: database.users.map(({ password: _password, ...user }) => user),
+    notifications: database.notifications,
+    emailOutbox: database.emailOutbox
   });
 }

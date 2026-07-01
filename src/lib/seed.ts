@@ -7,10 +7,19 @@ export const seedDatabase: NewsletterDatabase = {
   users: [
     {
       id: "user-admin",
+      name: "Deekshith N C",
+      email: "deekshith.nc@arivulearn.com",
+      password: "admin123",
+      role: "admin",
+      active: true
+    },
+    {
+      id: "user-admin-demo",
       name: "Marketing Manager",
       email: "admin@mypal.in",
       password: "admin123",
-      role: "admin"
+      role: "admin",
+      active: true
     },
     {
       id: "user-academic",
@@ -18,7 +27,8 @@ export const seedDatabase: NewsletterDatabase = {
       email: "academic@mypal.in",
       password: "team123",
       role: "contributor",
-      departmentId: "academic"
+      departmentId: "academic",
+      active: true
     },
     {
       id: "user-tech",
@@ -26,7 +36,8 @@ export const seedDatabase: NewsletterDatabase = {
       email: "tech@mypal.in",
       password: "team123",
       role: "contributor",
-      departmentId: "tech"
+      departmentId: "tech",
+      active: true
     },
     {
       id: "user-sales",
@@ -34,7 +45,8 @@ export const seedDatabase: NewsletterDatabase = {
       email: "sales@mypal.in",
       password: "team123",
       role: "contributor",
-      departmentId: "sales"
+      departmentId: "sales",
+      active: true
     },
     {
       id: "user-marketing",
@@ -42,7 +54,8 @@ export const seedDatabase: NewsletterDatabase = {
       email: "marketing@mypal.in",
       password: "team123",
       role: "contributor",
-      departmentId: "marketing"
+      departmentId: "marketing",
+      active: true
     }
   ],
   departments: [
@@ -233,5 +246,17 @@ export const seedDatabase: NewsletterDatabase = {
       updatedAt: "2026-06-28T10:00:00.000Z"
     }
   ],
-  generatedPdfs: []
+  generatedPdfs: [],
+  notifications: [
+    {
+      id: "notification-welcome-admin",
+      userId: "user-admin",
+      title: "Workspace ready",
+      body: "Your myPAL newsletter studio is ready. Review team submissions, tune the issue plan, and export when the readiness score is green.",
+      type: "system",
+      read: false,
+      createdAt: "2026-06-20T10:00:00.000Z"
+    }
+  ],
+  emailOutbox: []
 };
