@@ -7,6 +7,7 @@ export async function GET() {
     departments: database.departments,
     issues: database.issues,
     settings: database.settings,
-    generatedPdfs: database.generatedPdfs
+    generatedPdfs: database.generatedPdfs,
+    users: database.users.map(({ password: _password, ...user }) => user)
   });
 }

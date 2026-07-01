@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const imageSchema = z.object({
   id: z.string().optional(),
-  url: z.string().url("Use a valid image URL"),
+  url: z.string().min(10, "Upload a photo or use a valid image URL"),
   caption: z.string().min(1, "Caption is required")
 });
 
@@ -43,6 +43,14 @@ export const settingsSchema = z.object({
     designation: z.string().min(2),
     qualification: z.string().min(2),
     message: z.string().min(20),
-    photoUrl: z.string().url()
+    photoUrl: z.string().min(10)
   })
+});
+
+export const userSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.enum(["admin", "contributor"]),
+  departmentId: z.string().optional()
 });

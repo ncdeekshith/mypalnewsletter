@@ -9,22 +9,32 @@ import {
   ImagePlus,
   LayoutDashboard,
   LogOut,
+  Palette,
   Plus,
   Save,
   Settings,
   UploadCloud,
+  UserPlus,
+  Users,
   XCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { NewsletterPreview } from "@/components/newsletter-preview";
 import { StatusBadge } from "@/components/status-badge";
-import type { AdminSettings, AppUser, Department, NewsletterIssue, Submission, SubmissionStatus } from "@/lib/types";
+import type { AdminSettings, AppUser, Department, NewsletterIssue, Submission, SubmissionImage, SubmissionStatus } from "@/lib/types";
 
 type Bootstrap = {
   departments: Department[];
   issues: NewsletterIssue[];
   settings: AdminSettings;
   generatedPdfs: { id: string; fileName: string; fileUrl: string; createdAt: string }[];
+  users: AppUser[];
 };
+
+type Tab = "submit" | "review" | "design" | "accounts" | "settings";
+
+const departmentOptions = ["academic", "tech", "sales", "marketing"];
+const noteRoles = ["CEO", "CTO", "CBO", "COO", "Other"];
 
 const emptyImages = Array.from({ length: 4 }, (_, index) => ({
   id: `image-${index + 1}`,
@@ -37,7 +47,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [activeTab, setActiveTab] = useState<"submit" | "review" | "settings">("submit");
+  const [activeTab, setActiveTab] = useState<Tab>("submit");
   const [message, setMessage] = useState("");
   const [generating, setGenerating] = useState(false);
 
@@ -54,37 +64,29 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    const currentUser = user;
-
-    async function load() {
-      const [bootResponse, submissionsResponse] = await Promise.all([
-        fetch("/api/bootstrap"),
-        fetch(`/api/submissions?userId=${currentUser.id}&role=${currentUser.role}`)
-      ]);
-      setBootstrap(await bootResponse.json());
-      const submissionsData = await submissionsResponse.json();
-      setSubmissions(submissionsData.submissions);
-    }
-
-    load();
+    void loadAll(user);
   }, [user]);
 
+  async function loadAll(currentUser = user) {
+    if (!currentUser) return;
+    const [bootResponse, submissionsResponse] = await Promise.all([
+      fetch("/api/bootstrap"),
+      fetch(`/api/submissions?userId=${currentUser.id}&role=${currentUser.role}`)
+    ]);
+    setBootstrap(await bootResponse.json());
+    const submissionsData = await submissionsResponse.json();
+    setSubmissions(submissionsData.submissions);
+  }
+
   const issue = bootstrap?.issues[0];
-  const department = useMemo(() => {
+  const activeDepartment = useMemo(() => {
     if (!bootstrap || !user) return null;
-    return bootstrap.departments.find((item) => item.id === user.departmentId) ?? bootstrap.departments[1];
+    return bootstrap.departments.find((item) => item.id === user.departmentId) ?? bootstrap.departments.find((item) => item.id === "academic") ?? null;
   }, [bootstrap, user]);
 
   function logout() {
     localStorage.removeItem("mypal-user");
     router.push("/login");
-  }
-
-  async function refreshSubmissions() {
-    if (!user) return;
-    const response = await fetch(`/api/submissions?userId=${user.id}&role=${user.role}`);
-    const data = await response.json();
-    setSubmissions(data.submissions);
   }
 
   async function patchSubmission(id: string, patch: Partial<Submission>) {
@@ -93,7 +95,7 @@ export default function DashboardPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch)
     });
-    await refreshSubmissions();
+    await loadAll();
   }
 
   async function generatePdf() {
@@ -113,64 +115,71 @@ export default function DashboardPage() {
     }
     setMessage("PDF generated successfully.");
     window.open(data.pdf.fileUrl, "_blank");
-    const bootResponse = await fetch("/api/bootstrap");
-    setBootstrap(await bootResponse.json());
+    await loadAll();
   }
 
   if (!user || !bootstrap || !issue) {
-    return <main className="grid min-h-screen place-items-center bg-mypal-cloud font-bold text-mypal-deep">Loading dashboard...</main>;
+    return <main className="grid min-h-screen place-items-center bg-[#fff6ef] font-bold text-mypal-orange">Loading myPAL workspace...</main>;
   }
 
   const admin = user.role === "admin";
 
   return (
-    <main className="min-h-screen bg-mypal-cloud">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+    <main className="min-h-screen bg-[#fff7f0] text-[#2a211d]">
+      <header className="sticky top-0 z-20 border-b border-orange-100 bg-white/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded bg-mypal-orange px-3 py-2 text-xl font-black text-white">myPAL</div>
+            <div className="rounded bg-mypal-orange px-4 py-2 text-xl font-black text-white shadow-[0_10px_24px_rgba(244,123,32,0.25)]">myPAL</div>
             <div>
-              <h1 className="text-xl font-black text-mypal-deep">Newsletter Generator</h1>
-              <p className="text-sm text-slate-500">{issue.month} {issue.year} • Issue {issue.issueNumber}</p>
+              <h1 className="text-xl font-black text-[#2a211d]">Newsletter Studio</h1>
+              <p className="text-sm text-orange-700">{issue.month} {issue.year} • Issue {issue.issueNumber}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <a href="/preview" target="_blank" className="hidden items-center gap-2 rounded border border-slate-200 px-4 py-2 text-sm font-bold text-mypal-deep md:flex">
+            <a href="/preview" target="_blank" className="hidden items-center gap-2 rounded border border-orange-200 bg-white px-4 py-2 text-sm font-bold text-[#2a211d] md:flex">
               <Eye size={16} /> Preview
             </a>
             {admin ? (
               <button onClick={generatePdf} disabled={generating} className="flex items-center gap-2 rounded bg-mypal-orange px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
-                <Download size={16} /> {generating ? "Generating..." : "Generate PDF"}
+                <Download size={16} /> {generating ? "Generating..." : "Export PDF"}
               </button>
             ) : null}
-            <button onClick={logout} className="rounded border border-slate-200 p-2 text-slate-600" aria-label="Log out">
+            <button onClick={logout} className="rounded border border-orange-200 bg-white p-2 text-orange-700" aria-label="Log out">
               <LogOut size={18} />
             </button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[260px_1fr]">
-        <aside className="h-fit rounded-lg bg-white p-3 shadow-soft">
+      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[280px_1fr]">
+        <aside className="h-fit rounded-lg border border-orange-100 bg-white p-3 shadow-soft">
           <NavButton active={activeTab === "submit"} icon={<UploadCloud size={18} />} label="Add Monthly Update" onClick={() => setActiveTab("submit")} />
           {admin ? <NavButton active={activeTab === "review"} icon={<LayoutDashboard size={18} />} label="Review Workflow" onClick={() => setActiveTab("review")} /> : null}
-          {admin ? <NavButton active={activeTab === "settings"} icon={<Settings size={18} />} label="Admin Settings" onClick={() => setActiveTab("settings")} /> : null}
-          <div className="mt-4 rounded bg-mypal-cloud p-3 text-sm">
-            <p className="font-bold text-mypal-deep">{user.name}</p>
-            <p className="text-slate-600">{user.role === "admin" ? "Admin / Marketing Manager" : department?.name}</p>
+          {admin ? <NavButton active={activeTab === "design"} icon={<Palette size={18} />} label="Design Studio" onClick={() => setActiveTab("design")} /> : null}
+          {admin ? <NavButton active={activeTab === "accounts"} icon={<Users size={18} />} label="Team Accounts" onClick={() => setActiveTab("accounts")} /> : null}
+          {admin ? <NavButton active={activeTab === "settings"} icon={<Settings size={18} />} label="Brand Settings" onClick={() => setActiveTab("settings")} /> : null}
+          <div className="mt-4 rounded bg-orange-50 p-4 text-sm">
+            <p className="font-black text-[#2a211d]">{user.name}</p>
+            <p className="text-orange-700">{user.role === "admin" ? "Admin / Marketing Manager" : activeDepartment?.name}</p>
           </div>
         </aside>
 
         <section>
-          {message ? <p className="mb-4 rounded bg-white px-4 py-3 text-sm font-bold text-mypal-deep shadow-soft">{message}</p> : null}
+          {message ? <p className="mb-4 rounded border border-orange-100 bg-white px-4 py-3 text-sm font-bold text-[#2a211d] shadow-soft">{message}</p> : null}
           {activeTab === "submit" ? (
-            <SubmissionForm user={user} issue={issue} department={department} submissions={submissions} onSaved={refreshSubmissions} />
+            <SubmissionForm user={user} issue={issue} departments={bootstrap.departments} defaultDepartment={activeDepartment} submissions={submissions} onSaved={() => loadAll()} />
           ) : null}
           {activeTab === "review" && admin ? (
-            <ReviewBoard submissions={submissions} onPatch={patchSubmission} generatedPdfs={bootstrap.generatedPdfs} />
+            <ReviewBoard submissions={submissions} departments={bootstrap.departments} onPatch={patchSubmission} generatedPdfs={bootstrap.generatedPdfs} />
+          ) : null}
+          {activeTab === "design" && admin ? (
+            <DesignStudio issue={issue} settings={bootstrap.settings} submissions={submissions} onPatch={patchSubmission} onSettingsSaved={() => loadAll()} />
+          ) : null}
+          {activeTab === "accounts" && admin ? (
+            <AccountsPanel users={bootstrap.users} departments={bootstrap.departments} onCreated={() => loadAll()} />
           ) : null}
           {activeTab === "settings" && admin ? (
-            <SettingsForm settings={bootstrap.settings} onSaved={async () => setBootstrap(await (await fetch("/api/bootstrap")).json())} />
+            <SettingsForm settings={bootstrap.settings} onSaved={() => loadAll()} />
           ) : null}
         </section>
       </div>
@@ -182,7 +191,7 @@ function NavButton({ active, icon, label, onClick }: { active: boolean; icon: Re
   return (
     <button
       onClick={onClick}
-      className={`mb-2 flex w-full items-center gap-3 rounded px-3 py-3 text-left text-sm font-bold ${active ? "bg-mypal-orange text-white" : "text-slate-700 hover:bg-mypal-cloud"}`}
+      className={`mb-2 flex w-full items-center gap-3 rounded px-3 py-3 text-left text-sm font-bold transition ${active ? "bg-mypal-orange text-white shadow-[0_10px_24px_rgba(244,123,32,0.22)]" : "text-[#4a3930] hover:bg-orange-50"}`}
     >
       {icon}
       {label}
@@ -193,28 +202,29 @@ function NavButton({ active, icon, label, onClick }: { active: boolean; icon: Re
 function SubmissionForm({
   user,
   issue,
-  department,
+  departments,
+  defaultDepartment,
   submissions,
   onSaved
 }: {
   user: AppUser;
   issue: NewsletterIssue;
-  department: Department | null;
+  departments: Department[];
+  defaultDepartment: Department | null;
   submissions: Submission[];
   onSaved: () => Promise<void>;
 }) {
-  const existing = submissions.find((item) => item.departmentId === department?.id) ?? submissions[0];
-  const [form, setForm] = useState({
-    id: existing?.id,
-    sectionTitle: existing?.sectionTitle ?? department?.sectionTitle ?? "",
-    headline: existing?.headline ?? "",
-    intro: existing?.intro ?? "",
-    bullets: existing?.bullets?.join("\n") ?? "",
-    metrics: existing?.metrics?.map((metric) => `${metric.label}: ${metric.value}`).join("\n") ?? "Students reached: \nLeads generated: \nAdmissions: ",
-    images: existing?.images?.length ? existing.images : emptyImages,
-    status: existing?.status ?? "draft"
-  });
+  const [departmentId, setDepartmentId] = useState(defaultDepartment?.id ?? "academic");
+  const selectedDepartment = departments.find((item) => item.id === departmentId) ?? defaultDepartment;
+  const existing = submissions.find((item) => item.departmentId === departmentId);
+  const [form, setForm] = useState(() => formFromSubmission(existing, selectedDepartment));
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const nextDepartment = departments.find((item) => item.id === departmentId) ?? defaultDepartment;
+    const nextExisting = submissions.find((item) => item.departmentId === departmentId);
+    setForm(formFromSubmission(nextExisting, nextDepartment));
+  }, [departmentId, submissions, departments, defaultDepartment]);
 
   async function submit(event: FormEvent, status: SubmissionStatus) {
     event.preventDefault();
@@ -223,23 +233,16 @@ function SubmissionForm({
       id: form.id,
       issueId: issue.id,
       userId: user.id,
-      departmentId: department?.id ?? "custom",
+      departmentId,
       sectionTitle: form.sectionTitle,
       headline: form.headline,
       intro: form.intro,
       bullets: form.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
-      metrics: form.metrics
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .map((item) => {
-          const [label, ...value] = item.split(":");
-          return { label: label.trim(), value: value.join(":").trim() || "0" };
-        }),
+      metrics: form.metrics.split("\n").map((item) => item.trim()).filter(Boolean).map(metricFromLine),
       images: form.images.filter((image) => image.url && image.caption),
       status,
       visible: true,
-      sortOrder: department?.sortOrder ?? 10
+      sortOrder: selectedDepartment?.sortOrder ?? 10
     };
 
     const response = await fetch("/api/submissions", {
@@ -249,7 +252,7 @@ function SubmissionForm({
     });
 
     if (!response.ok) {
-      setError("Please include an intro, 3 bullet points, and at least 4 images with captions.");
+      setError("Please include an intro, 3 bullet points, and at least 4 photos with captions.");
       return;
     }
 
@@ -258,63 +261,47 @@ function SubmissionForm({
     await onSaved();
   }
 
+  function updateImage(index: number, patch: Partial<SubmissionImage>) {
+    const next = [...form.images];
+    next[index] = { ...next[index], ...patch };
+    setForm({ ...form, images: next });
+  }
+
   return (
-    <form className="rounded-lg bg-white p-6 shadow-soft">
+    <form className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-mypal-orange">{department?.name ?? "Team"}</p>
-          <h2 className="text-3xl font-black text-mypal-deep">Monthly Update</h2>
+          <p className="text-sm font-black uppercase tracking-[0.16em] text-mypal-orange">Team submission</p>
+          <h2 className="text-3xl font-black text-[#2a211d]">Monthly Update</h2>
         </div>
         <StatusBadge status={form.status as SubmissionStatus} />
       </div>
 
-      <Field label="Section title" value={form.sectionTitle} onChange={(value) => setForm({ ...form, sectionTitle: value })} />
+      <div className="grid gap-5 md:grid-cols-2">
+        <SelectField label="Department" value={departmentId} onChange={setDepartmentId} options={departments.filter((item) => departmentOptions.includes(item.id)).map((item) => ({ label: item.name, value: item.id }))} />
+        <Field label="Section title" value={form.sectionTitle} onChange={(value) => setForm({ ...form, sectionTitle: value })} />
+      </div>
       <Field label="Main update headline" value={form.headline} onChange={(value) => setForm({ ...form, headline: value })} />
       <TextArea label="Short description / introduction" value={form.intro} onChange={(value) => setForm({ ...form, intro: value })} rows={4} />
       <TextArea label="Bullet-point achievements" hint="One bullet per line, minimum 3." value={form.bullets} onChange={(value) => setForm({ ...form, bullets: value })} rows={6} />
       <TextArea label="Metrics" hint="One per line, format: Students reached: 1240" value={form.metrics} onChange={(value) => setForm({ ...form, metrics: value })} rows={4} />
 
       <div className="mt-6">
-        <div className="mb-3 flex items-center gap-2 font-bold text-mypal-deep"><ImagePlus size={18} /> Images and captions</div>
+        <div className="mb-3 flex items-center gap-2 font-black text-[#2a211d]"><ImagePlus size={18} /> Photos and captions</div>
         <div className="grid gap-4 md:grid-cols-2">
           {form.images.map((image, index) => (
-            <div key={image.id ?? index} className="rounded border border-slate-200 p-4">
-              <input
-                value={image.url}
-                onChange={(event) => {
-                  const next = [...form.images];
-                  next[index] = { ...image, url: event.target.value };
-                  setForm({ ...form, images: next });
-                }}
-                className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                placeholder="Image URL"
-              />
-              <input
-                value={image.caption}
-                onChange={(event) => {
-                  const next = [...form.images];
-                  next[index] = { ...image, caption: event.target.value };
-                  setForm({ ...form, images: next });
-                }}
-                className="mt-2 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                placeholder="Caption"
-              />
-            </div>
+            <ImageDropCard key={image.id ?? index} image={image} index={index} onChange={(patch) => updateImage(index, patch)} />
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setForm({ ...form, images: [...form.images, { id: `image-${Date.now()}`, url: "", caption: "" }] })}
-          className="mt-3 flex items-center gap-2 rounded border border-slate-200 px-4 py-2 text-sm font-bold text-mypal-deep"
-        >
-          <Plus size={16} /> Add optional image
+        <button type="button" onClick={() => setForm({ ...form, images: [...form.images, { id: `image-${Date.now()}`, url: "", caption: "" }] })} className="mt-3 flex items-center gap-2 rounded border border-orange-200 bg-white px-4 py-2 text-sm font-bold text-[#2a211d]">
+          <Plus size={16} /> Add optional photo
         </button>
       </div>
 
       {error ? <p className="mt-4 rounded bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{error}</p> : null}
 
       <div className="mt-7 flex flex-wrap gap-3">
-        <button onClick={(event) => submit(event, "draft")} className="flex items-center gap-2 rounded border border-slate-200 px-5 py-3 font-bold text-mypal-deep">
+        <button onClick={(event) => submit(event, "draft")} className="flex items-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-[#2a211d]">
           <Save size={18} /> Save Draft
         </button>
         <button onClick={(event) => submit(event, "submitted")} className="flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white">
@@ -327,63 +314,56 @@ function SubmissionForm({
 
 function ReviewBoard({
   submissions,
+  departments,
   onPatch,
   generatedPdfs
 }: {
   submissions: Submission[];
+  departments: Department[];
   onPatch: (id: string, patch: Partial<Submission>) => Promise<void>;
   generatedPdfs: { id: string; fileName: string; fileUrl: string; createdAt: string }[];
 }) {
-  const buckets: SubmissionStatus[] = ["submitted", "approved", "rejected", "draft", "published"];
+  const buckets: SubmissionStatus[] = ["submitted", "approved", "rejected", "draft"];
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
-        {buckets.slice(0, 4).map((status) => (
-          <div key={status} className="rounded-lg bg-white p-4 shadow-soft">
-            <p className="text-sm font-bold capitalize text-slate-500">{status}</p>
-            <p className="mt-2 text-3xl font-black text-mypal-deep">{submissions.filter((item) => item.status === status).length}</p>
+        {buckets.map((status) => (
+          <div key={status} className="rounded-lg border border-orange-100 bg-white p-4 shadow-soft">
+            <p className="text-sm font-bold capitalize text-orange-700">{status}</p>
+            <p className="mt-2 text-3xl font-black text-[#2a211d]">{submissions.filter((item) => item.status === status).length}</p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-lg bg-white p-6 shadow-soft">
+      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-mypal-deep">All Submissions</h2>
-          <a href="/preview" target="_blank" className="flex items-center gap-2 rounded border border-slate-200 px-4 py-2 text-sm font-bold text-mypal-deep">
+          <h2 className="text-2xl font-black text-[#2a211d]">Review Workflow</h2>
+          <a href="/preview" target="_blank" className="flex items-center gap-2 rounded border border-orange-200 bg-white px-4 py-2 text-sm font-bold text-[#2a211d]">
             <FileText size={16} /> Preview Newsletter
           </a>
         </div>
         <div className="space-y-3">
           {submissions.map((submission) => (
-            <div key={submission.id} className="rounded border border-slate-200 p-4">
+            <div key={submission.id} className="rounded border border-orange-100 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={submission.status} />
+                    <span className="rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700">{departmentName(departments, submission.departmentId)}</span>
                     <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
                       <input type="checkbox" checked={submission.visible} onChange={(event) => onPatch(submission.id, { visible: event.target.checked })} />
-                      Show
+                      Show in PDF
                     </label>
                   </div>
-                  <h3 className="mt-3 text-xl font-black text-mypal-deep">{submission.sectionTitle}</h3>
-                  <p className="mt-1 font-semibold text-slate-700">{submission.headline}</p>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{submission.intro}</p>
+                  <input value={submission.sectionTitle} onChange={(event) => onPatch(submission.id, { sectionTitle: event.target.value })} className="mt-3 w-full rounded border border-transparent px-0 text-xl font-black text-[#2a211d] outline-none focus:border-orange-200 focus:px-2" />
+                  <input value={submission.headline} onChange={(event) => onPatch(submission.id, { headline: event.target.value })} className="mt-1 w-full rounded border border-transparent px-0 font-semibold text-slate-700 outline-none focus:border-orange-200 focus:px-2" />
+                  <textarea value={submission.intro} onChange={(event) => onPatch(submission.id, { intro: event.target.value })} rows={2} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 text-slate-600 outline-mypal-orange" />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => onPatch(submission.id, { status: "approved" })} className="rounded bg-emerald-600 p-2 text-white" aria-label="Approve">
-                    <CheckCircle2 size={18} />
-                  </button>
-                  <button onClick={() => onPatch(submission.id, { status: "rejected" })} className="rounded bg-rose-600 p-2 text-white" aria-label="Reject">
-                    <XCircle size={18} />
-                  </button>
-                  <input
-                    type="number"
-                    value={submission.sortOrder}
-                    onChange={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })}
-                    className="w-16 rounded border border-slate-200 px-2 text-sm"
-                    aria-label="Sort order"
-                  />
+                  <button onClick={() => onPatch(submission.id, { status: "approved" })} className="rounded bg-emerald-600 p-2 text-white" aria-label="Approve"><CheckCircle2 size={18} /></button>
+                  <button onClick={() => onPatch(submission.id, { status: "rejected" })} className="rounded bg-rose-600 p-2 text-white" aria-label="Reject"><XCircle size={18} /></button>
+                  <input type="number" value={submission.sortOrder} onChange={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-16 rounded border border-orange-200 px-2 text-sm" aria-label="Sort order" />
                 </div>
               </div>
             </div>
@@ -391,11 +371,11 @@ function ReviewBoard({
         </div>
       </div>
 
-      <div className="rounded-lg bg-white p-6 shadow-soft">
-        <h2 className="text-2xl font-black text-mypal-deep">Generated PDFs</h2>
+      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <h2 className="text-2xl font-black text-[#2a211d]">Generated PDFs</h2>
         <div className="mt-3 space-y-2">
           {generatedPdfs.length ? generatedPdfs.map((pdf) => (
-            <a key={pdf.id} href={pdf.fileUrl} target="_blank" className="flex items-center justify-between rounded border border-slate-200 px-4 py-3 text-sm font-bold text-mypal-deep">
+            <a key={pdf.id} href={pdf.fileUrl} target="_blank" className="flex items-center justify-between rounded border border-orange-100 px-4 py-3 text-sm font-bold text-[#2a211d]">
               {pdf.fileName}
               <Download size={16} />
             </a>
@@ -406,8 +386,122 @@ function ReviewBoard({
   );
 }
 
-function SettingsForm({ settings, onSaved }: { settings: AdminSettings; onSaved: () => Promise<void> }) {
+function DesignStudio({
+  issue,
+  settings,
+  submissions,
+  onPatch,
+  onSettingsSaved
+}: {
+  issue: NewsletterIssue;
+  settings: AdminSettings;
+  submissions: Submission[];
+  onPatch: (id: string, patch: Partial<Submission>) => Promise<void>;
+  onSettingsSaved: () => Promise<void>;
+}) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
+      <div className="space-y-4">
+        <div className="rounded-lg border border-orange-100 bg-white p-5 shadow-soft">
+          <h2 className="text-2xl font-black text-[#2a211d]">Design Studio</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Use this like a lightweight Canva panel: change brand fields, edit copy, reorder sections, hide blocks, then export the PDF.</p>
+        </div>
+        <SettingsForm settings={settings} compact onSaved={onSettingsSaved} />
+        <div className="rounded-lg border border-orange-100 bg-white p-5 shadow-soft">
+          <h3 className="font-black text-[#2a211d]">Section Layout</h3>
+          <div className="mt-3 space-y-3">
+            {submissions.map((submission) => (
+              <div key={submission.id} className="rounded border border-orange-100 p-3">
+                <label className="flex items-center justify-between gap-3 text-sm font-bold text-[#2a211d]">
+                  <span>{submission.sectionTitle}</span>
+                  <input type="checkbox" checked={submission.visible} onChange={(event) => onPatch(submission.id, { visible: event.target.checked })} />
+                </label>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs font-bold text-orange-700">Order</span>
+                  <input type="number" value={submission.sortOrder} onChange={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-20 rounded border border-orange-200 px-2 py-1 text-sm" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="rounded-lg border border-orange-100 bg-white p-4 shadow-soft">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-black text-[#2a211d]">Live PDF Preview</h3>
+          <a href="/preview" target="_blank" className="rounded bg-mypal-orange px-3 py-2 text-sm font-bold text-white">Open full preview</a>
+        </div>
+        <div className="h-[820px] overflow-auto rounded border border-orange-100 bg-[#fff7f0] p-4">
+          <div className="origin-top scale-[0.78]">
+            <NewsletterPreview settings={settings} issue={issue} submissions={submissions} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; departments: Department[]; onCreated: () => Promise<void> }) {
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic" });
+  const [message, setMessage] = useState("");
+
+  async function createAccount(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    const response = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setMessage(data.message ?? "Could not create account.");
+      return;
+    }
+    setForm({ name: "", email: "", password: "", role: "contributor", departmentId: "academic" });
+    setMessage("Account created.");
+    await onCreated();
+  }
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+      <form onSubmit={createAccount} className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <div className="flex items-center gap-2">
+          <UserPlus className="text-mypal-orange" size={22} />
+          <h2 className="text-2xl font-black text-[#2a211d]">Create Team Account</h2>
+        </div>
+        <Field label="Name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
+        <Field label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
+        <Field label="Password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} type="password" />
+        <SelectField label="Role" value={form.role} onChange={(value) => setForm({ ...form, role: value })} options={[{ label: "Contributor", value: "contributor" }, { label: "Admin", value: "admin" }]} />
+        <SelectField label="Department" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={departments.filter((item) => departmentOptions.includes(item.id)).map((item) => ({ label: item.name, value: item.id }))} />
+        {message ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{message}</p> : null}
+        <button className="mt-6 flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><UserPlus size={18} /> Create Account</button>
+      </form>
+
+      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <h2 className="text-2xl font-black text-[#2a211d]">Team Directory</h2>
+        <div className="mt-4 grid gap-3">
+          {users.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-orange-100 px-4 py-3">
+              <div>
+                <p className="font-black text-[#2a211d]">{item.name}</p>
+                <p className="text-sm text-slate-600">{item.email}</p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="font-bold capitalize text-orange-700">{item.role}</p>
+                <p className="text-slate-500">{departmentName(departments, item.departmentId ?? "")}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminSettings; onSaved: () => Promise<void>; compact?: boolean }) {
   const [form, setForm] = useState(settings);
+  const [noteRole, setNoteRole] = useState(noteRoles.includes(settings.leadership.designation) ? settings.leadership.designation : "Other");
   const [saved, setSaved] = useState(false);
 
   async function save(event: FormEvent) {
@@ -422,63 +516,137 @@ function SettingsForm({ settings, onSaved }: { settings: AdminSettings; onSaved:
   }
 
   return (
-    <form onSubmit={save} className="rounded-lg bg-white p-6 shadow-soft">
-      <h2 className="text-3xl font-black text-mypal-deep">Admin Settings</h2>
-      <div className="grid gap-5 md:grid-cols-2">
+    <form onSubmit={save} className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+      <h2 className={`${compact ? "text-xl" : "text-3xl"} font-black text-[#2a211d]`}>Brand Settings</h2>
+      <div className={compact ? "grid gap-3" : "grid gap-5 md:grid-cols-2"}>
         <Field label="Company logo URL" value={form.companyLogoUrl} onChange={(value) => setForm({ ...form, companyLogoUrl: value })} />
         <Field label="Newsletter title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
         <Field label="Footer text" value={form.footerText} onChange={(value) => setForm({ ...form, footerText: value })} />
         <Field label="Website link" value={form.websiteUrl} onChange={(value) => setForm({ ...form, websiteUrl: value })} />
         <Field label="Social media handle" value={form.socialHandle} onChange={(value) => setForm({ ...form, socialHandle: value })} />
         <Field label="QR code image URL" value={form.qrCodeUrl} onChange={(value) => setForm({ ...form, qrCodeUrl: value })} />
-        <Field label="Primary brand color" value={form.brandPrimary} onChange={(value) => setForm({ ...form, brandPrimary: value })} />
-        <Field label="Secondary brand color" value={form.brandSecondary} onChange={(value) => setForm({ ...form, brandSecondary: value })} />
       </div>
 
-      <h3 className="mt-8 text-xl font-black text-mypal-deep">Leadership Profile</h3>
-      <div className="grid gap-5 md:grid-cols-2">
-        <Field label="Name" value={form.leadership.name} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, name: value } })} />
-        <Field label="Designation" value={form.leadership.designation} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, designation: value } })} />
+      <h3 className="mt-8 text-xl font-black text-[#2a211d]">Main Note Author</h3>
+      <div className={compact ? "grid gap-3" : "grid gap-5 md:grid-cols-2"}>
+        <Field label="Author name" value={form.leadership.name} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, name: value } })} />
+        <SelectField label="From" value={noteRole} onChange={(value) => {
+          setNoteRole(value);
+          if (value !== "Other") setForm({ ...form, leadership: { ...form.leadership, designation: value } });
+        }} options={noteRoles.map((role) => ({ label: role, value: role }))} />
+        {noteRole === "Other" ? <Field label="Other designation" value={form.leadership.designation} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, designation: value } })} /> : null}
         <Field label="Qualification" value={form.leadership.qualification} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, qualification: value } })} />
-        <Field label="Profile photo URL" value={form.leadership.photoUrl} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, photoUrl: value } })} />
       </div>
-      <TextArea label="Monthly message" value={form.leadership.message} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, message: value } })} rows={5} />
+      <SingleImageUpload label="Author photo" value={form.leadership.photoUrl} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, photoUrl: value } })} />
+      <TextArea label="Monthly message" value={form.leadership.message} onChange={(value) => setForm({ ...form, leadership: { ...form.leadership, message: value } })} rows={compact ? 4 : 5} />
 
       {saved ? <p className="mt-4 rounded bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">Settings saved.</p> : null}
-      <button className="mt-6 flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white">
-        <Save size={18} /> Save Settings
-      </button>
+      <button className="mt-6 flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><Save size={18} /> Save Settings</button>
     </form>
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function ImageDropCard({ image, index, onChange }: { image: SubmissionImage; index: number; onChange: (patch: Partial<SubmissionImage>) => void }) {
   return (
-    <label className="mt-5 block">
+    <div className="rounded border border-orange-100 bg-orange-50/40 p-4">
+      <DropZone label={`Photo ${index + 1}`} value={image.url} onChange={(url) => onChange({ url })} />
+      <input value={image.url.startsWith("data:") ? "Uploaded photo" : image.url} onChange={(event) => onChange({ url: event.target.value })} className="mt-3 w-full rounded border border-orange-100 bg-white px-3 py-2 text-sm" placeholder="Image URL or dropped photo" />
+      <input value={image.caption} onChange={(event) => onChange({ caption: event.target.value })} className="mt-2 w-full rounded border border-orange-100 bg-white px-3 py-2 text-sm" placeholder="Caption" />
+    </div>
+  );
+}
+
+function SingleImageUpload({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="mt-5">
       <span className="text-sm font-bold text-slate-700">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded border border-slate-200 px-3 py-3 outline-mypal-orange" />
+      <DropZone label="Drop author photo" value={value} onChange={onChange} />
+      <input value={value.startsWith("data:") ? "Uploaded photo" : value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded border border-orange-100 bg-white px-3 py-3 outline-mypal-orange" />
+    </div>
+  );
+}
+
+function DropZone({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  async function handleFiles(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    onChange(await fileToDataUrl(file));
+  }
+
+  return (
+    <label
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        void handleFiles(event.dataTransfer.files);
+      }}
+      className="mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center overflow-hidden rounded border-2 border-dashed border-orange-200 bg-white p-4 text-center transition hover:border-mypal-orange"
+    >
+      {value ? <img src={value} alt={label} className="mb-3 h-28 w-full rounded object-cover" /> : <UploadCloud className="mb-2 text-mypal-orange" size={28} />}
+      <span className="text-sm font-black text-[#2a211d]">{label}</span>
+      <span className="mt-1 text-xs text-orange-700">Drag and drop, or click to upload</span>
+      <input type="file" accept="image/*" className="hidden" onChange={(event) => void handleFiles(event.target.files)} />
     </label>
   );
 }
 
-function TextArea({
-  label,
-  hint,
-  value,
-  onChange,
-  rows
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  onChange: (value: string) => void;
-  rows: number;
-}) {
+function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return (
     <label className="mt-5 block">
       <span className="text-sm font-bold text-slate-700">{label}</span>
-      {hint ? <span className="ml-2 text-xs text-slate-500">{hint}</span> : null}
-      <textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded border border-slate-200 px-3 py-3 outline-mypal-orange" />
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded border border-orange-100 bg-white px-3 py-3 outline-mypal-orange" />
     </label>
   );
+}
+
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { label: string; value: string }[] }) {
+  return (
+    <label className="mt-5 block">
+      <span className="text-sm font-bold text-slate-700">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded border border-orange-100 bg-white px-3 py-3 outline-mypal-orange">
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function TextArea({ label, hint, value, onChange, rows }: { label: string; hint?: string; value: string; onChange: (value: string) => void; rows: number }) {
+  return (
+    <label className="mt-5 block">
+      <span className="text-sm font-bold text-slate-700">{label}</span>
+      {hint ? <span className="ml-2 text-xs text-orange-700">{hint}</span> : null}
+      <textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded border border-orange-100 bg-white px-3 py-3 outline-mypal-orange" />
+    </label>
+  );
+}
+
+function formFromSubmission(submission: Submission | undefined, department: Department | null | undefined) {
+  return {
+    id: submission?.id,
+    sectionTitle: submission?.sectionTitle ?? department?.sectionTitle ?? "",
+    headline: submission?.headline ?? "",
+    intro: submission?.intro ?? "",
+    bullets: submission?.bullets?.join("\n") ?? "",
+    metrics: submission?.metrics?.map((metric) => `${metric.label}: ${metric.value}`).join("\n") ?? "Students reached: \nLeads generated: \nAdmissions: ",
+    images: submission?.images?.length ? submission.images : emptyImages,
+    status: submission?.status ?? "draft"
+  };
+}
+
+function metricFromLine(item: string) {
+  const [label, ...value] = item.split(":");
+  return { label: label.trim(), value: value.join(":").trim() || "0" };
+}
+
+function departmentName(departments: Department[], id: string) {
+  return departments.find((item) => item.id === id)?.name ?? id;
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }

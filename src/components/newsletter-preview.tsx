@@ -15,32 +15,33 @@ export function NewsletterPreview({
 
   return (
     <article className="mx-auto max-w-[900px] bg-white text-mypal-ink shadow-soft print:max-w-none print:shadow-none">
-      <section className="relative overflow-hidden bg-mypal-deep px-10 py-10 text-white print:break-after-page">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-bl-full bg-mypal-orange" />
+      <section className="relative overflow-hidden bg-mypal-orange px-10 py-10 text-white print:break-after-page">
+        <div className="absolute right-0 top-0 h-56 w-56 rounded-bl-full bg-white/20" />
+        <div className="absolute bottom-0 left-0 h-28 w-full bg-gradient-to-t from-[#c54e08]/45 to-transparent" />
         <div className="relative z-10 flex items-start justify-between gap-8">
           <div>
-            <img src={settings.companyLogoUrl} alt="myPAL logo" className="mb-12 h-16 max-w-56 rounded bg-white object-contain p-2" />
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-100">
+            <img src={settings.companyLogoUrl} alt="myPAL logo" className="mb-12 h-16 max-w-56 rounded bg-white object-contain p-2 shadow-lg" />
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/90">
               {issue.month} {issue.year} • Issue {issue.issueNumber}
             </p>
             <h1 className="mt-4 max-w-2xl text-6xl font-black leading-[0.95]">
               {settings.title}
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-slate-100">
-              A monthly snapshot of progress across learning, growth, product, and brand teams.
+              A polished monthly snapshot of progress across learning, growth, product, and brand teams.
             </p>
           </div>
-          <div className="min-w-36 rounded bg-white/10 p-4 text-right">
-            <p className="text-xs uppercase text-orange-100">Published</p>
+          <div className="min-w-36 rounded bg-white p-4 text-right text-mypal-orange shadow-lg">
+            <p className="text-xs font-black uppercase">Published</p>
             <p className="mt-2 text-xl font-bold">{new Date(issue.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
           </div>
         </div>
       </section>
 
-      <section className="px-10 py-10 print:break-after-page">
+      <section className="bg-[#fff8f1] px-10 py-10 print:break-after-page">
         <div className="grid gap-8 md:grid-cols-[220px_1fr]">
           <div>
-            <img src={settings.leadership.photoUrl} alt={settings.leadership.name} className="aspect-square w-full rounded-lg object-cover" />
+            <img src={settings.leadership.photoUrl} alt={settings.leadership.name} className="aspect-square w-full rounded-lg border-4 border-white object-cover shadow-soft" />
             <h2 className="mt-4 text-2xl font-extrabold">{settings.leadership.name}</h2>
             <p className="font-semibold text-mypal-orange">{settings.leadership.designation}</p>
             <p className="text-sm text-slate-500">{settings.leadership.qualification}</p>
@@ -93,7 +94,7 @@ export function NewsletterPreview({
         </section>
       ))}
 
-      <footer className="bg-mypal-deep px-10 py-8 text-white">
+      <footer className="bg-[#2a211d] px-10 py-8 text-white">
         <div className="grid gap-8 md:grid-cols-[1fr_auto]">
           <div>
             <p className="text-2xl font-black">{settings.footerText}</p>

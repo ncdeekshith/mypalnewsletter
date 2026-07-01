@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
 import { seedDatabase } from "@/lib/seed";
-import type { AdminSettings, GeneratedPdf, NewsletterDatabase, Submission, SubmissionImage } from "@/lib/types";
+import type { AdminSettings, AppUser, GeneratedPdf, NewsletterDatabase, Submission, SubmissionImage } from "@/lib/types";
 
 const dataDir = path.join(process.cwd(), "data");
 const dataPath = path.join(dataDir, "newsletter-db.json");
@@ -101,4 +101,21 @@ export async function addGeneratedPdf(pdf: Omit<GeneratedPdf, "id" | "createdAt"
   database.generatedPdfs.unshift(generatedPdf);
   await writeDatabase(database);
   return generatedPdf;
+}
+
+export async function createUser(input: Omit<AppUser, "id">) {
+  const database = await readDatabase();
+  if (database.users.some((user) => user.email.toLowerCase() === input.email.toLowerCase())) {
+    throw new Error("A user with this email already exists.");
+  }
+
+  const user: AppUser = {
+    ...input,
+    id: nanoid()
+  };
+
+  database.users.push(user);
+  await writeDatabase(database);
+  const { password: _password, ...safeUser } = user;
+  return safeUser;
 }
