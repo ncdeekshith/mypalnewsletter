@@ -10,9 +10,16 @@ export function NewsletterPreview({
   submissions: Submission[];
 }) {
   const approved = submissions
-    .filter((item) => item.visible && ["approved", "published"].includes(item.status))
+    .filter((item) => item.visible && !["draft", "rejected"].includes(item.status))
     .sort((a, b) => a.sortOrder - b.sortOrder);
-  const topMetrics = approved.flatMap((item) => item.metrics.slice(0, 2)).slice(0, 6);
+  const snapshotMetrics = approved.flatMap((item) =>
+    item.metrics.map((metric) => ({ ...metric, section: item.sectionTitle }))
+  );
+  const snapshot = snapshotMetrics.length ? snapshotMetrics : approved.map((item) => ({
+    label: item.sectionTitle,
+    value: String(item.bullets.length),
+    section: "Updates"
+  }));
 
   return (
     <article className="newsletter-doc mx-auto">
@@ -38,8 +45,8 @@ export function NewsletterPreview({
 
           <div className="grid grid-cols-[1.3fr_1fr] gap-8">
             <div className="rounded bg-white/14 p-5 backdrop-blur">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-white/75">Brand line</p>
-              <p className="mt-2 text-2xl font-black">{settings.footerText}</p>
+              <p className="text-2xl font-black">{settings.footerText}</p>
+              <SocialLinks settings={settings} theme="light" />
             </div>
             <div className="rounded bg-[#2a211d] p-5">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Published</p>
@@ -72,7 +79,7 @@ export function NewsletterPreview({
           <div>
             <h3 className="text-2xl font-black text-[#2a211d]">Inside this issue</h3>
             <div className="mt-4 grid gap-3">
-              {approved.map((submission, index) => (
+              {approved.length ? approved.map((submission, index) => (
                 <div key={submission.id} className="flex items-center gap-4 rounded border border-orange-100 bg-[#fff8f1] p-4">
                   <span className="grid h-9 w-9 place-items-center rounded bg-mypal-orange text-sm font-black text-white">{index + 1}</span>
                   <div>
@@ -80,18 +87,29 @@ export function NewsletterPreview({
                     <p className="line-clamp-1 text-sm font-semibold text-slate-600">{submission.headline}</p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded border border-orange-100 bg-[#fff8f1] p-5">
+                  <p className="font-black text-[#2a211d]">Content collection in progress</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Team sections will appear here as soon as contributors submit their monthly updates.</p>
+                </div>
+              )}
             </div>
           </div>
           <div>
             <h3 className="text-2xl font-black text-[#2a211d]">Snapshot</h3>
-            <div className="mt-4 grid gap-3">
-              {topMetrics.map((metric) => (
-                <div key={`${metric.label}-${metric.value}`} className="rounded bg-[#2a211d] p-4 text-white">
+            <div className="mt-4 grid max-h-[520px] gap-3 overflow-hidden">
+              {snapshot.length ? snapshot.slice(0, 10).map((metric) => (
+                <div key={`${metric.section}-${metric.label}-${metric.value}`} className="rounded bg-[#2a211d] p-4 text-white">
                   <p className="text-2xl font-black text-mypal-orange">{metric.value}</p>
                   <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-white/70">{metric.label}</p>
+                  <p className="mt-1 text-[10px] font-bold text-white/45">{metric.section}</p>
                 </div>
-              ))}
+              )) : (
+                <div className="rounded bg-[#2a211d] p-5 text-white">
+                  <p className="text-2xl font-black text-mypal-orange">--</p>
+                  <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-white/70">Metrics will appear after teams submit updates.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -114,8 +132,8 @@ export function NewsletterPreview({
           <div className="grid grid-cols-[1fr_130px] gap-8 border-t border-white/15 pt-8">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.18em] text-mypal-orange">Connect</p>
-              <p className="mt-2 text-xl font-black">{settings.websiteUrl}</p>
-              <p className="mt-1 text-lg font-semibold text-white/75">{settings.socialHandle}</p>
+              <a href={settings.websiteUrl} className="mt-2 block text-xl font-black text-white">{settings.websiteUrl}</a>
+              <SocialLinks settings={settings} theme="dark" />
               <div className="mt-6 flex flex-wrap gap-3">
                 {[...settings.partnerLogos, ...settings.recognitionBadges].map((logo) => (
                   <img key={logo.id} src={logo.imageUrl} alt={logo.name} className="h-12 rounded bg-white object-contain p-2" />
@@ -142,7 +160,7 @@ function SectionPage({
   pageNumber: string;
 }) {
   const hero = submission.images[0];
-  const gallery = submission.images.slice(1, 4);
+  const gallery = submission.images.slice(1);
 
   return (
     <Page>
@@ -167,10 +185,16 @@ function SectionPage({
             <img src={hero.url} alt={hero.caption} className="h-[300px] w-full object-cover" />
             <figcaption className="px-4 py-3 text-sm font-black text-[#2a211d]">{hero.caption}</figcaption>
           </figure>
-        ) : null}
+        ) : (
+          <div className="rounded-lg bg-[#2a211d] p-7 text-white shadow-soft">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-mypal-orange">Text Feature</p>
+            <p className="mt-5 text-3xl font-black leading-tight">{submission.headline}</p>
+            <p className="mt-5 text-sm font-semibold leading-7 text-white/75">This section was submitted without photos, so the PDF uses a clean editorial layout focused on outcomes and proof points.</p>
+          </div>
+        )}
       </div>
 
-      <div className="mt-7 grid grid-cols-[1fr_1fr] gap-7">
+      <div className={`mt-7 grid gap-7 ${gallery.length ? "grid-cols-[1fr_1fr]" : "grid-cols-1"}`}>
         <div>
           <h4 className="mb-3 text-lg font-black text-[#2a211d]">Key updates</h4>
           <ul className="grid gap-3">
@@ -182,14 +206,14 @@ function SectionPage({
             ))}
           </ul>
         </div>
-        <div className="grid gap-3">
-          {gallery.map((image) => (
+        {gallery.length ? <div className="grid gap-3">
+          {gallery.slice(0, 4).map((image) => (
             <figure key={image.id} className="grid grid-cols-[120px_1fr] overflow-hidden rounded bg-[#fff8f1]">
               <img src={image.url} alt={image.caption} className="h-24 w-full object-cover" />
               <figcaption className="flex items-center px-4 text-sm font-black leading-5 text-[#2a211d]">{image.caption}</figcaption>
             </figure>
           ))}
-        </div>
+        </div> : null}
       </div>
       <PageFooter settings={settings} page={pageNumber} />
     </Page>
@@ -218,9 +242,23 @@ function PageHeader({ settings, issue, label }: { settings: AdminSettings; issue
 function PageFooter({ settings, page }: { settings: AdminSettings; page: string }) {
   return (
     <footer className="absolute bottom-8 left-10 right-10 flex items-center justify-between border-t border-orange-100 pt-4 text-xs font-bold text-slate-500">
-      <span>{settings.socialHandle} • {settings.websiteUrl}</span>
+      <span>{settings.socialHandle} • <a href={settings.websiteUrl}>{settings.websiteUrl}</a></span>
       <span>{page}</span>
     </footer>
+  );
+}
+
+function SocialLinks({ settings, theme }: { settings: AdminSettings; theme: "light" | "dark" }) {
+  const links = settings.socialLinks?.length ? settings.socialLinks : [{ id: "website", label: "Website", url: settings.websiteUrl }];
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      {links.map((link) => (
+        <a key={link.id} href={link.url} className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-black ${theme === "dark" ? "bg-white/10 text-white" : "bg-white text-[#2a211d]"}`}>
+          <span className="grid h-5 w-5 place-items-center rounded-full bg-mypal-orange text-[10px] text-white">{link.label.slice(0, 1).toUpperCase()}</span>
+          {link.label}
+        </a>
+      ))}
+    </div>
   );
 }
 

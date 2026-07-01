@@ -16,7 +16,7 @@ export const submissionSchema = z.object({
   intro: z.string().min(20, "Add a short introduction"),
   bullets: z.array(z.string().min(5)).min(3, "Add at least 3 bullet updates"),
   metrics: z.array(z.object({ label: z.string().min(1), value: z.string().min(1) })).default([]),
-  images: z.array(imageSchema).min(4, "Upload or link at least 4 images"),
+  images: z.array(imageSchema).default([]),
   status: z.enum(["draft", "submitted", "approved", "rejected", "published"]).default("draft"),
   visible: z.boolean().default(true),
   sortOrder: z.number().default(10),
@@ -30,6 +30,8 @@ export const settingsSchema = z.object({
   footerText: z.string().min(2),
   websiteUrl: z.string().url(),
   socialHandle: z.string().min(2),
+  socialLinks: z.array(z.object({ id: z.string(), label: z.string().min(1), url: z.string().url() })).default([]),
+  stakeholders: z.array(z.object({ id: z.string(), name: z.string().min(1), email: z.string().email(), whatsappSubscriberId: z.string().optional(), group: z.string().min(1) })).default([]),
   qrCodeUrl: z.string().url(),
   brandPrimary: z.string().min(4),
   brandSecondary: z.string().min(4),
@@ -52,7 +54,8 @@ export const userSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   role: z.enum(["admin", "contributor"]),
-  departmentId: z.string().optional()
+  departmentId: z.string().optional(),
+  whatsappSubscriberId: z.string().optional()
 });
 
 export const issueSchema = z.object({

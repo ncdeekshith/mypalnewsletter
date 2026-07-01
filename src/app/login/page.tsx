@@ -1,20 +1,24 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, LockKeyhole, Mail, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { signInWithGooglePopup } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("admin@mypal.in");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setMessage("");
 
     const response = await fetch("/api/login", {
       method: "POST",
@@ -31,6 +35,44 @@ export default function LoginPage() {
     const data = await response.json();
     localStorage.setItem("mypal-user", JSON.stringify(data.user));
     router.push("/dashboard");
+  }
+
+  async function googleLogin() {
+    setLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await signInWithGooglePopup();
+      const response = await fetch("/api/login/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: result.user.email })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.message ?? "Google account is not registered.");
+        setLoading(false);
+        return;
+      }
+      localStorage.setItem("mypal-user", JSON.stringify(data.user));
+      router.push("/dashboard");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Google login failed.");
+      setLoading(false);
+    }
+  }
+
+  async function sendLoginLink() {
+    setLinkLoading(true);
+    setError("");
+    setMessage("");
+    await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    setMessage("If this email is registered, a login link has been sent.");
+    setLinkLoading(false);
   }
 
   return (
@@ -54,6 +96,7 @@ export default function LoginPage() {
             <h2 className="text-3xl font-black text-mypal-deep">Sign in</h2>
             <p className="mt-2 text-sm text-slate-600">Demo admin: admin@mypal.in / admin123</p>
             <p className="text-sm text-slate-600">Team users: academic@mypal.in / team123</p>
+            <p className="text-sm text-slate-600">Main admin: deekshith.nc@arivulearn.com / admin123</p>
 
             <label className="mt-8 block text-sm font-bold text-slate-700">Email</label>
             <div className="mt-2 flex items-center gap-2 rounded border border-slate-200 px-3">
@@ -80,6 +123,7 @@ export default function LoginPage() {
             </div>
 
             {error ? <p className="mt-4 rounded bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p> : null}
+            {message ? <p className="mt-4 rounded bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{message}</p> : null}
 
             <button
               disabled={loading}
@@ -87,6 +131,22 @@ export default function LoginPage() {
             >
               {loading ? "Signing in..." : "Open dashboard"}
               <ArrowRight size={18} />
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={googleLogin}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-mypal-deep transition hover:bg-orange-50 disabled:opacity-60"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              disabled={linkLoading}
+              onClick={sendLoginLink}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-white disabled:opacity-60"
+            >
+              <Send size={16} /> {linkLoading ? "Sending..." : "Forgot password / send login link"}
             </button>
           </form>
         </section>

@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { seedDatabase } from "@/lib/seed";
 import { firebaseEnabled } from "@/lib/firebase";
 import { readFirebaseDatabase, writeFirebaseDatabase } from "@/lib/firebase-store";
-import type { AdminSettings, AppNotification, AppUser, EmailOutboxItem, GeneratedPdf, NewsletterDatabase, NewsletterIssue, Submission, SubmissionImage } from "@/lib/types";
+import type { AdminSettings, AppNotification, AppUser, Department, EmailOutboxItem, GeneratedPdf, NewsletterDatabase, NewsletterIssue, Submission, SubmissionImage } from "@/lib/types";
 
 const dataDir = path.join(process.cwd(), "data");
 const dataPath = path.join(dataDir, "newsletter-db.json");
@@ -195,6 +195,43 @@ export async function updateIssue(input: NewsletterIssue) {
   return input;
 }
 
+export async function createDepartment(input: Omit<Department, "id" | "sortOrder"> & { id?: string; sortOrder?: number }) {
+  const database = await readDatabase();
+  const id = input.id ?? input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  if (!id || database.departments.some((department) => department.id === id)) {
+    throw new Error("A department with this name already exists.");
+  }
+
+  const department: Department = {
+    id,
+    name: input.name,
+    sectionTitle: input.sectionTitle,
+    ownerTitle: input.ownerTitle,
+    sortOrder: input.sortOrder ?? database.departments.length
+  };
+  database.departments.push(department);
+  await writeDatabase(database);
+  return department;
+}
+
+export async function updateDepartment(id: string, patch: Partial<Department>) {
+  const database = await readDatabase();
+  const index = database.departments.findIndex((department) => department.id === id);
+  if (index === -1) throw new Error("Department not found.");
+  database.departments[index] = { ...database.departments[index], ...patch, id };
+  await writeDatabase(database);
+  return database.departments[index];
+}
+
+export async function deleteDepartment(id: string) {
+  const database = await readDatabase();
+  if (["leadership", "academic", "tech", "sales", "marketing"].includes(id)) {
+    throw new Error("Core departments cannot be deleted.");
+  }
+  database.departments = database.departments.filter((department) => department.id !== id);
+  await writeDatabase(database);
+}
+
 export async function addNotification(input: Omit<AppNotification, "id" | "read" | "createdAt">) {
   const database = await readDatabase();
   const notification: AppNotification = {
@@ -241,6 +278,12 @@ function normalizeDatabase(database: NewsletterDatabase): NewsletterDatabase {
     ...seedDatabase,
     ...database,
     users,
+    settings: {
+      ...seedDatabase.settings,
+      ...database.settings,
+      socialLinks: database.settings?.socialLinks ?? seedDatabase.settings.socialLinks,
+      stakeholders: database.settings?.stakeholders ?? seedDatabase.settings.stakeholders
+    },
     notifications: database.notifications ?? [],
     emailOutbox: database.emailOutbox ?? []
   };

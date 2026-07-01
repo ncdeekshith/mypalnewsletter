@@ -86,6 +86,15 @@ export const seedDatabase: NewsletterDatabase = {
     footerText: "At myPAL, we turn ambition into achievement.",
     websiteUrl: "https://mypal.in",
     socialHandle: "@mypal.education",
+    socialLinks: [
+      { id: "social-website", label: "Website", url: "https://mypal.in" },
+      { id: "social-instagram", label: "Instagram", url: "https://instagram.com/mypal.education" },
+      { id: "social-youtube", label: "YouTube", url: "https://youtube.com/@mypal" },
+      { id: "social-linkedin", label: "LinkedIn", url: "https://linkedin.com/company/mypal" }
+    ],
+    stakeholders: [
+      { id: "stakeholder-leadership", name: "Leadership Team", email: "deekshith.nc@arivulearn.com", group: "Leadership" }
+    ],
     qrCodeUrl: "https://dummyimage.com/180x180/232323/ffffff.png&text=QR",
     brandPrimary: "#f47b20",
     brandSecondary: "#1f2a44",

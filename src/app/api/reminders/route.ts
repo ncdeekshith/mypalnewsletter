@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { addNotification, readDatabase } from "@/lib/store";
 import { sendMail } from "@/lib/mailer";
+import { sendWhatsAppReminder } from "@/lib/whatsapp";
 
 export async function POST(request: Request) {
   const payload = await request.json().catch(() => ({}));
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
     (user) => user.active !== false && user.role === "contributor" && pendingDepartments.some((department) => department.id === user.departmentId)
   );
 
-  await Promise.all(recipients.map(async (user) => {
+  const whatsappResults = await Promise.all(recipients.map(async (user) => {
     const department = database.departments.find((item) => item.id === user.departmentId);
     await addNotification({
       userId: user.id,
@@ -27,9 +28,18 @@ export async function POST(request: Request) {
     await sendMail({
       to: user.email,
       subject: payload.subject ?? `Reminder: Submit ${issue.month} myPAL newsletter update`,
-      body: `Hi ${user.name},\n\nPlease submit your ${department?.name ?? "team"} monthly update for ${issue.title}.\n\nDue date: ${issue.dueDate ?? "Not set"}\nRequired: intro, 3 bullet achievements, metrics, and 4 photos with captions.\n\n- myPAL Newsletter Team`
+      body: `Hi ${user.name},\n\nPlease submit your ${department?.name ?? "team"} monthly update for ${issue.title}.\n\nDue date: ${issue.dueDate ?? "Not set"}\nRequired: intro, 3 bullet achievements, and metrics. Add photos if available; the PDF will adapt automatically.\n\n- myPAL Newsletter Team`
     });
+    if (payload.channel === "whatsapp" || payload.channel === "all") {
+      if (!user.whatsappSubscriberId) return { userId: user.id, ok: false, status: "missing_subscriber_id" };
+      return sendWhatsAppReminder({
+        to: user.whatsappSubscriberId,
+        month: issue.month,
+        date: issue.dueDate ?? issue.date
+      });
+    }
+    return { userId: user.id, ok: true, status: "email_only" };
   }));
 
-  return NextResponse.json({ sent: recipients.length, pendingDepartments: pendingDepartments.map((item) => item.name) });
+  return NextResponse.json({ sent: recipients.length, whatsappResults, pendingDepartments: pendingDepartments.map((item) => item.name) });
 }

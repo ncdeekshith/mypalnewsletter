@@ -8,7 +8,7 @@ type MailInput = {
 
 export async function sendMail(input: MailInput) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "myPAL Newsletter <newsletter@mypal.in>";
+  const from = process.env.EMAIL_FROM ?? "myPAL Newsletter <deekshith.nc@arivulearn.com>";
 
   if (!apiKey) {
     return queueEmail({

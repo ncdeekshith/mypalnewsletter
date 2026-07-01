@@ -8,6 +8,7 @@ export type AppUser = {
   password?: string;
   role: Role;
   departmentId?: string;
+  whatsappSubscriberId?: string;
   active?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -80,6 +81,20 @@ export type PartnerLogo = {
   imageUrl: string;
 };
 
+export type SocialLink = {
+  id: string;
+  label: string;
+  url: string;
+};
+
+export type Stakeholder = {
+  id: string;
+  name: string;
+  email: string;
+  whatsappSubscriberId?: string;
+  group: string;
+};
+
 export type AdminSettings = {
   id: string;
   companyLogoUrl: string;
@@ -87,6 +102,8 @@ export type AdminSettings = {
   footerText: string;
   websiteUrl: string;
   socialHandle: string;
+  socialLinks: SocialLink[];
+  stakeholders: Stakeholder[];
   qrCodeUrl: string;
   brandPrimary: string;
   brandSecondary: string;

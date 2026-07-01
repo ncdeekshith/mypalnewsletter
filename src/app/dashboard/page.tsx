@@ -44,7 +44,6 @@ type Bootstrap = {
 
 type Tab = "submit" | "review" | "design" | "planner" | "accounts" | "settings";
 
-const departmentOptions = ["academic", "tech", "sales", "marketing"];
 const noteRoles = ["CEO", "CTO", "CBO", "COO", "Other"];
 
 const emptyImages = Array.from({ length: 4 }, (_, index) => ({
@@ -61,6 +60,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("submit");
   const [message, setMessage] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem("mypal-user");
@@ -138,6 +138,25 @@ export default function DashboardPage() {
     await loadAll();
   }
 
+  async function publishIssue() {
+    if (!issue) return;
+    setPublishing(true);
+    setMessage("");
+    const response = await fetch("/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ issueId: issue.id })
+    });
+    const data = await response.json();
+    setPublishing(false);
+    if (!response.ok) {
+      setMessage(data.message ?? "Could not publish newsletter.");
+      return;
+    }
+    setMessage(`Published to ${data.recipients} stakeholder(s).`);
+    await loadAll();
+  }
+
   if (!user || !bootstrap || !issue) {
     return <main className="grid min-h-screen place-items-center bg-[#fff6ef] font-bold text-mypal-orange">Loading myPAL workspace...</main>;
   }
@@ -169,6 +188,11 @@ export default function DashboardPage() {
                 <Download size={16} /> {generating ? "Generating..." : "Export PDF"}
               </button>
             ) : null}
+            {admin ? (
+              <button onClick={publishIssue} disabled={publishing} className="hidden items-center gap-2 rounded bg-[#2a211d] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:flex">
+                <Send size={16} /> {publishing ? "Publishing..." : "Publish"}
+              </button>
+            ) : null}
             <button onClick={logout} className="rounded border border-orange-200 bg-white p-2 text-orange-700" aria-label="Log out">
               <LogOut size={18} />
             </button>
@@ -189,6 +213,7 @@ export default function DashboardPage() {
             <p className="text-orange-100">{user.role === "admin" ? "Main Admin / Marketing Manager" : activeDepartment?.name}</p>
           </div>
           <NotificationPanel notifications={userNotifications} userId={user.id} onUpdated={() => loadAll()} />
+          <PasswordResetCard user={user} onUpdated={(nextUser) => setUser(nextUser)} />
         </aside>
 
         <section>
@@ -261,6 +286,45 @@ function NotificationPanel({ notifications, userId, onUpdated }: { notifications
   );
 }
 
+function PasswordResetCard({ user, onUpdated }: { user: AppUser; onUpdated: (user: AppUser) => void }) {
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function resetPassword(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
+    const response = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, password })
+    });
+    const data = await response.json().catch(() => ({}));
+    setSaving(false);
+    if (!response.ok) {
+      setMessage(data.message ?? "Could not reset password.");
+      return;
+    }
+    const nextUser = { ...user };
+    localStorage.setItem("mypal-user", JSON.stringify(nextUser));
+    onUpdated(nextUser);
+    setPassword("");
+    setMessage("Password updated.");
+  }
+
+  return (
+    <form onSubmit={resetPassword} className="mt-4 rounded border border-white/10 bg-white/10 p-4 text-white">
+      <p className="text-sm font-black">Reset Password</p>
+      <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="New password" className="mt-3 w-full rounded border border-white/10 bg-white px-3 py-2 text-sm text-[#2a211d]" />
+      <button disabled={saving || password.length < 6} className="mt-3 w-full rounded bg-mypal-orange px-3 py-2 text-sm font-black text-white disabled:opacity-50">
+        {saving ? "Updating..." : "Update password"}
+      </button>
+      {message ? <p className="mt-2 text-xs font-bold text-orange-50">{message}</p> : null}
+    </form>
+  );
+}
+
 function SubmissionForm({
   user,
   issue,
@@ -321,7 +385,7 @@ function SubmissionForm({
     if (!response.ok) {
       const data = await response.json().catch(() => null);
       setSavingStatus(null);
-      setError(formatSubmissionError(data) || "Please include an intro, 3 bullet points, and at least 4 photos with captions.");
+      setError(formatSubmissionError(data) || "Please include an intro and at least 3 bullet points. Photos are optional.");
       return;
     }
 
@@ -350,7 +414,7 @@ function SubmissionForm({
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
-        <SelectField label="Department" value={departmentId} onChange={setDepartmentId} options={departments.filter((item) => departmentOptions.includes(item.id)).map((item) => ({ label: item.name, value: item.id }))} />
+        <SelectField label="Department" value={departmentId} onChange={setDepartmentId} options={teamDepartments(departments).map((item) => ({ label: item.name, value: item.id }))} />
         <Field label="Section title" value={form.sectionTitle} onChange={(value) => setForm({ ...form, sectionTitle: value })} />
       </div>
       <Field label="Main update headline" value={form.headline} onChange={(value) => setForm({ ...form, headline: value })} />
@@ -370,10 +434,11 @@ function SubmissionForm({
         </button>
       </div>
 
+      <SubmissionPreview form={form} department={selectedDepartment} />
       {error ? <p className="mt-4 rounded bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{error}</p> : null}
       {success ? <p className="mt-4 rounded bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">{success}</p> : null}
 
-      <div className="mt-7 flex flex-wrap gap-3">
+      <div className="sticky bottom-0 z-10 mt-7 flex flex-wrap gap-3 border-t border-orange-100 bg-white/95 py-4 backdrop-blur">
         <button type="button" disabled={Boolean(savingStatus)} onClick={(event) => submit(event, "draft")} className="flex items-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-[#2a211d] disabled:opacity-60">
           <Save size={18} /> {savingStatus === "draft" ? "Saving..." : "Save Draft"}
         </button>
@@ -382,6 +447,37 @@ function SubmissionForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function SubmissionPreview({ form, department }: { form: ReturnType<typeof formFromSubmission>; department: Department | null | undefined }) {
+  const images = form.images.filter((image) => image.url);
+  const bullets = form.bullets.split("\n").map((item) => item.trim()).filter(Boolean);
+  const metrics = form.metrics.split("\n").map((item) => item.trim()).filter(Boolean).map(metricFromLine);
+
+  return (
+    <div className="mt-6 rounded-lg border border-orange-100 bg-[#fff8f1] p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-mypal-orange">Submission Preview</p>
+          <h3 className="mt-1 text-xl font-black text-[#2a211d]">{form.sectionTitle || department?.sectionTitle || "Team update"}</h3>
+        </div>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-orange-700">{images.length ? `${images.length} photo${images.length === 1 ? "" : "s"}` : "Text-only ready"}</span>
+      </div>
+      <div className="mt-4 grid gap-4 md:grid-cols-[1fr_220px]">
+        <div>
+          <p className="text-lg font-black text-[#2a211d]">{form.headline || "Headline preview"}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{form.intro || "Your introduction will appear here."}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {metrics.slice(0, 4).map((metric) => <span key={`${metric.label}-${metric.value}`} className="rounded bg-white px-3 py-2 text-xs font-black text-[#2a211d]">{metric.label}: {metric.value || "-"}</span>)}
+          </div>
+          <ul className="mt-3 grid gap-2">
+            {bullets.slice(0, 3).map((bullet) => <li key={bullet} className="text-sm font-semibold text-slate-700">• {bullet}</li>)}
+          </ul>
+        </div>
+        {images[0] ? <img src={images[0].url} alt={images[0].caption || "Preview photo"} className="h-40 w-full rounded object-cover" /> : <div className="grid h-40 place-items-center rounded border border-dashed border-orange-200 bg-white text-center text-sm font-bold text-orange-700">No photo selected. PDF will use a clean text layout.</div>}
+      </div>
+    </div>
   );
 }
 
@@ -625,6 +721,7 @@ function IssuePlanner({
   });
   const readiness = getReadiness(issue, submissions, departments);
   const [reminderMessage, setReminderMessage] = useState("");
+  const [reminderChannel, setReminderChannel] = useState("all");
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -640,7 +737,7 @@ function IssuePlanner({
     const response = await fetch("/api/reminders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
+      body: JSON.stringify({ channel: reminderChannel })
     });
     const data = await response.json();
     setReminderMessage(response.ok ? `Reminders queued for ${data.sent} contributor(s).` : "Could not send reminders.");
@@ -667,6 +764,11 @@ function IssuePlanner({
         <TextArea label="Internal production notes" value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} rows={5} />
         <div className="mt-6 flex flex-wrap gap-3">
           <button className="flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><Save size={18} /> Save Issue Plan</button>
+          <select value={reminderChannel} onChange={(event) => setReminderChannel(event.target.value)} className="rounded border border-orange-200 bg-white px-4 py-3 font-bold text-[#2a211d]">
+            <option value="all">Email + WhatsApp</option>
+            <option value="email">Email only</option>
+            <option value="whatsapp">WhatsApp only</option>
+          </select>
           <button type="button" onClick={sendReminders} className="flex items-center gap-2 rounded border border-orange-200 bg-white px-5 py-3 font-bold text-[#2a211d]"><Send size={18} /> Send Reminders</button>
         </div>
         {reminderMessage ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{reminderMessage}</p> : null}
@@ -677,7 +779,7 @@ function IssuePlanner({
         <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
           <h2 className="text-2xl font-black text-[#2a211d]">Team Collection Board</h2>
           <div className="mt-4 grid gap-3">
-            {departments.filter((department) => departmentOptions.includes(department.id)).map((department) => {
+            {teamDepartments(departments).map((department) => {
               const submission = submissions.find((item) => item.departmentId === department.id);
               return (
                 <div key={department.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-orange-100 px-4 py-3">
@@ -765,9 +867,10 @@ function DesignStudio({
 }
 
 function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; departments: Department[]; onCreated: () => Promise<void> }) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic", whatsappSubscriberId: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic", active: true });
+  const [editForm, setEditForm] = useState({ name: "", email: "", password: "", role: "contributor", departmentId: "academic", whatsappSubscriberId: "", active: true });
+  const [departmentForm, setDepartmentForm] = useState({ name: "", ownerTitle: "" });
   const [message, setMessage] = useState("");
 
   async function createAccount(event: FormEvent) {
@@ -783,7 +886,7 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
       setMessage(data.message ?? "Could not create account.");
       return;
     }
-    setForm({ name: "", email: "", password: "", role: "contributor", departmentId: "academic" });
+    setForm({ name: "", email: "", password: "", role: "contributor", departmentId: "academic", whatsappSubscriberId: "" });
     setMessage("Account created.");
     await onCreated();
   }
@@ -796,6 +899,7 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
       password: "",
       role: user.role,
       departmentId: user.departmentId ?? "academic",
+      whatsappSubscriberId: user.whatsappSubscriberId ?? "",
       active: user.active !== false
     });
   }
@@ -810,7 +914,8 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
       body: JSON.stringify({
         ...editForm,
         password: editForm.password || undefined,
-        departmentId: editForm.role === "admin" ? undefined : editForm.departmentId
+        departmentId: editForm.role === "admin" ? undefined : editForm.departmentId,
+        whatsappSubscriberId: editForm.whatsappSubscriberId || undefined
       })
     });
     const data = await response.json().catch(() => ({}));
@@ -820,6 +925,27 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
     }
     setEditingId(null);
     setMessage("Account updated.");
+    await onCreated();
+  }
+
+  async function createDepartment() {
+    setMessage("");
+    const response = await fetch("/api/departments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: departmentForm.name,
+        sectionTitle: departmentForm.name,
+        ownerTitle: departmentForm.ownerTitle || "Team Owner"
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.message ?? "Could not add department.");
+      return;
+    }
+    setDepartmentForm({ name: "", ownerTitle: "" });
+    setMessage("Department added.");
     await onCreated();
   }
 
@@ -846,9 +972,16 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
         <Field label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
         <Field label="Password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} type="password" />
         <SelectField label="Role" value={form.role} onChange={(value) => setForm({ ...form, role: value })} options={[{ label: "Contributor", value: "contributor" }, { label: "Admin", value: "admin" }]} />
-        {form.role === "contributor" ? <SelectField label="Department" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={departments.filter((item) => departmentOptions.includes(item.id)).map((item) => ({ label: item.name, value: item.id }))} /> : null}
+        {form.role === "contributor" ? <SelectField label="Department" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={teamDepartments(departments).map((item) => ({ label: item.name, value: item.id }))} /> : null}
+        <Field label="WhatsApp subscriber ID" value={form.whatsappSubscriberId} onChange={(value) => setForm({ ...form, whatsappSubscriberId: value })} />
         {message ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{message}</p> : null}
         <button className="mt-6 flex items-center gap-2 rounded bg-mypal-orange px-5 py-3 font-bold text-white"><UserPlus size={18} /> Create Account</button>
+        <div className="mt-8 border-t border-orange-100 pt-6">
+          <h3 className="font-black text-[#2a211d]">Add Department</h3>
+          <Field label="Department name" value={departmentForm.name} onChange={(value) => setDepartmentForm({ ...departmentForm, name: value })} />
+          <Field label="Owner title" value={departmentForm.ownerTitle} onChange={(value) => setDepartmentForm({ ...departmentForm, ownerTitle: value })} />
+          <button type="button" onClick={createDepartment} className="mt-4 rounded border border-orange-200 bg-white px-4 py-2 text-sm font-bold text-[#2a211d]">Add Department</button>
+        </div>
       </form>
 
       <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-[0_24px_70px_rgba(97,48,17,0.09)]">
@@ -865,7 +998,8 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
                   <Field label="Email" value={editForm.email} onChange={(value) => setEditForm({ ...editForm, email: value })} />
                   <Field label="New password" value={editForm.password} onChange={(value) => setEditForm({ ...editForm, password: value })} type="password" />
                   <SelectField label="Role" value={editForm.role} onChange={(value) => setEditForm({ ...editForm, role: value })} options={[{ label: "Contributor", value: "contributor" }, { label: "Admin", value: "admin" }]} />
-                  {editForm.role === "contributor" ? <SelectField label="Department" value={editForm.departmentId} onChange={(value) => setEditForm({ ...editForm, departmentId: value })} options={departments.filter((department) => departmentOptions.includes(department.id)).map((department) => ({ label: department.name, value: department.id }))} /> : null}
+                  {editForm.role === "contributor" ? <SelectField label="Department" value={editForm.departmentId} onChange={(value) => setEditForm({ ...editForm, departmentId: value })} options={teamDepartments(departments).map((department) => ({ label: department.name, value: department.id }))} /> : null}
+                  <Field label="WhatsApp subscriber ID" value={editForm.whatsappSubscriberId} onChange={(value) => setEditForm({ ...editForm, whatsappSubscriberId: value })} />
                   <label className="mt-5 flex items-center gap-2 text-sm font-bold text-slate-700">
                     <input type="checkbox" checked={editForm.active} onChange={(event) => setEditForm({ ...editForm, active: event.target.checked })} />
                     Active login
@@ -902,15 +1036,29 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
 function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminSettings; onSaved: () => Promise<void>; compact?: boolean }) {
   const [form, setForm] = useState(settings);
   const [noteRole, setNoteRole] = useState(noteRoles.includes(settings.leadership.designation) ? settings.leadership.designation : "Other");
+  const [socialLines, setSocialLines] = useState((settings.socialLinks ?? []).map((item) => `${item.label}: ${item.url}`).join("\n"));
+  const [stakeholderLines, setStakeholderLines] = useState((settings.stakeholders ?? []).map((item) => `${item.name}, ${item.email}, ${item.group}, ${item.whatsappSubscriberId ?? ""}`).join("\n"));
   const [saved, setSaved] = useState(false);
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    const nextForm = {
+      ...form,
+      socialLinks: socialLines.split("\n").map((line, index) => {
+        const [label, ...url] = line.split(":");
+        return { id: `social-${index}`, label: label.trim(), url: url.join(":").trim() };
+      }).filter((item) => item.label && item.url),
+      stakeholders: stakeholderLines.split("\n").map((line, index) => {
+        const [name, email, group, whatsappSubscriberId] = line.split(",").map((item) => item.trim());
+        return { id: `stakeholder-${index}`, name, email, group: group || "Stakeholder", whatsappSubscriberId };
+      }).filter((item) => item.name && item.email)
+    };
     await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
+      body: JSON.stringify(nextForm)
     });
+    setForm(nextForm);
     setSaved(true);
     await onSaved();
   }
@@ -926,6 +1074,8 @@ function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminS
         <Field label="Social media handle" value={form.socialHandle} onChange={(value) => setForm({ ...form, socialHandle: value })} />
         <Field label="QR code image URL" value={form.qrCodeUrl} onChange={(value) => setForm({ ...form, qrCodeUrl: value })} />
       </div>
+      <TextArea label="Clickable social links" hint="One per line. Format: Instagram: https://..." value={socialLines} onChange={setSocialLines} rows={compact ? 4 : 5} />
+      {!compact ? <TextArea label="Stakeholder email database" hint="One per line. Format: Name, email, group, whatsappSubscriberId" value={stakeholderLines} onChange={setStakeholderLines} rows={5} /> : null}
 
       <h3 className="mt-8 text-xl font-black text-[#2a211d]">Main Note Author</h3>
       <div className={compact ? "grid gap-3" : "grid gap-5 md:grid-cols-2"}>
@@ -1060,14 +1210,18 @@ function departmentName(departments: Department[], id: string) {
   return departments.find((item) => item.id === id)?.name ?? id;
 }
 
+function teamDepartments(departments: Department[]) {
+  return departments.filter((department) => department.id !== "leadership");
+}
+
 function getReadiness(issue: NewsletterIssue, submissions: Submission[], departments: Department[]) {
-  const requiredDepartments = departments.filter((department) => departmentOptions.includes(department.id));
+  const requiredDepartments = teamDepartments(departments);
   const visibleSubmissions = submissions.filter((submission) => submission.visible);
   const approvedVisible = visibleSubmissions.filter((submission) => ["approved", "published"].includes(submission.status));
   const requiredSubmitted = requiredDepartments.filter((department) =>
     submissions.some((submission) => submission.departmentId === department.id && submission.status !== "draft")
   ).length;
-  const imageReady = visibleSubmissions.filter((submission) => submission.images.length >= 4 && submission.images.every((image) => image.url && image.caption)).length;
+  const imageReady = visibleSubmissions.filter((submission) => submission.images.every((image) => image.url && image.caption)).length;
   const blockers: string[] = [];
 
   requiredDepartments.forEach((department) => {
@@ -1077,7 +1231,6 @@ function getReadiness(issue: NewsletterIssue, submissions: Submission[], departm
   });
 
   visibleSubmissions.forEach((submission) => {
-    if (submission.images.length < 4) blockers.push(`${submission.sectionTitle} needs at least 4 images.`);
     if (submission.bullets.length < 3) blockers.push(`${submission.sectionTitle} needs at least 3 bullet updates.`);
   });
 

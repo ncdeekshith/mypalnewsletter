@@ -24,6 +24,14 @@ export function getFirebaseStorage() {
   return getStorage(getFirebaseApp());
 }
 
+export async function signInWithGooglePopup() {
+  if (typeof window === "undefined") throw new Error("Google sign-in is only available in the browser.");
+  const { getAuth, GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
+  const auth = getAuth(getFirebaseApp());
+  const provider = new GoogleAuthProvider();
+  return signInWithPopup(auth, provider);
+}
+
 export async function initFirebaseAnalytics() {
   if (typeof window === "undefined") return null;
   const { getAnalytics, isSupported } = await import("firebase/analytics");
