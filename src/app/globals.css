@@ -34,9 +34,14 @@ select {
 .newsletter-page {
   width: 210mm;
   height: 297mm;
-  padding: 18mm 16mm;
+  padding: 16mm 16mm 26mm;
   break-after: page;
   page-break-after: always;
+}
+
+.newsletter-content {
+  max-height: 235mm;
+  overflow: hidden;
 }
 
 .newsletter-page:not(.cover-page):not(.dark-page) {

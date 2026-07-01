@@ -23,7 +23,10 @@ export async function POST(request: Request) {
 
   try {
     await fs.mkdir(outputDir, { recursive: true });
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
     const page = await browser.newPage({ viewport: { width: 1240, height: 1754 }, deviceScaleFactor: 2 });
     await page.goto(`${origin}/preview/print?issueId=${issue.id}`, { waitUntil: "networkidle" });
     await page.pdf({

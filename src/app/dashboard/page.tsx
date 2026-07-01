@@ -23,6 +23,7 @@ import {
   Sparkles,
   Trash2,
   UploadCloud,
+  User,
   UserPlus,
   Users,
   XCircle
@@ -42,7 +43,7 @@ type Bootstrap = {
   emailOutbox: EmailOutboxItem[];
 };
 
-type Tab = "submit" | "review" | "design" | "planner" | "accounts" | "settings";
+type Tab = "submit" | "review" | "design" | "planner" | "accounts" | "stakeholders" | "settings" | "profile";
 
 const noteRoles = ["CEO", "CTO", "CBO", "COO", "Other"];
 
@@ -101,11 +102,17 @@ export default function DashboardPage() {
   }
 
   async function patchSubmission(id: string, patch: Partial<Submission>) {
-    await fetch(`/api/submissions/${id}`, {
+    const response = await fetch(`/api/submissions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch)
     });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.message ?? "Could not update submission.");
+      return;
+    }
+    setMessage(patch.status ? `Submission ${patch.status}.` : "Submission updated.");
     await loadAll();
   }
 
@@ -207,13 +214,14 @@ export default function DashboardPage() {
           {admin ? <NavButton active={activeTab === "design"} icon={<Palette size={18} />} label="Design Studio" onClick={() => setActiveTab("design")} /> : null}
           {admin ? <NavButton active={activeTab === "planner"} icon={<CalendarDays size={18} />} label="Issue Planner" onClick={() => setActiveTab("planner")} /> : null}
           {admin ? <NavButton active={activeTab === "accounts"} icon={<Users size={18} />} label="Team Accounts" onClick={() => setActiveTab("accounts")} /> : null}
+          {admin ? <NavButton active={activeTab === "stakeholders"} icon={<Send size={18} />} label="Stakeholders" onClick={() => setActiveTab("stakeholders")} /> : null}
           {admin ? <NavButton active={activeTab === "settings"} icon={<Settings size={18} />} label="Brand Settings" onClick={() => setActiveTab("settings")} /> : null}
+          <NavButton active={activeTab === "profile"} icon={<User size={18} />} label="Profile" onClick={() => setActiveTab("profile")} />
           <div className="mt-4 rounded border border-white/10 bg-white/10 p-4 text-sm text-white">
             <p className="font-black">{user.name}</p>
             <p className="text-orange-100">{user.role === "admin" ? "Main Admin / Marketing Manager" : activeDepartment?.name}</p>
           </div>
           <NotificationPanel notifications={userNotifications} userId={user.id} onUpdated={() => loadAll()} />
-          <PasswordResetCard user={user} onUpdated={(nextUser) => setUser(nextUser)} />
         </aside>
 
         <section>
@@ -233,8 +241,14 @@ export default function DashboardPage() {
           {activeTab === "accounts" && admin ? (
             <AccountsPanel users={bootstrap.users} departments={bootstrap.departments} onCreated={() => loadAll()} />
           ) : null}
+          {activeTab === "stakeholders" && admin ? (
+            <StakeholderPanel settings={bootstrap.settings} onSaved={() => loadAll()} />
+          ) : null}
           {activeTab === "settings" && admin ? (
             <SettingsForm settings={bootstrap.settings} onSaved={() => loadAll()} />
+          ) : null}
+          {activeTab === "profile" ? (
+            <ProfileSettings user={user} onUpdated={(nextUser) => setUser(nextUser)} />
           ) : null}
         </section>
       </div>
@@ -286,7 +300,7 @@ function NotificationPanel({ notifications, userId, onUpdated }: { notifications
   );
 }
 
-function PasswordResetCard({ user, onUpdated }: { user: AppUser; onUpdated: (user: AppUser) => void }) {
+function ProfileSettings({ user, onUpdated }: { user: AppUser; onUpdated: (user: AppUser) => void }) {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -314,14 +328,28 @@ function PasswordResetCard({ user, onUpdated }: { user: AppUser; onUpdated: (use
   }
 
   return (
-    <form onSubmit={resetPassword} className="mt-4 rounded border border-white/10 bg-white/10 p-4 text-white">
-      <p className="text-sm font-black">Reset Password</p>
-      <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="New password" className="mt-3 w-full rounded border border-white/10 bg-white px-3 py-2 text-sm text-[#2a211d]" />
-      <button disabled={saving || password.length < 6} className="mt-3 w-full rounded bg-mypal-orange px-3 py-2 text-sm font-black text-white disabled:opacity-50">
-        {saving ? "Updating..." : "Update password"}
-      </button>
-      {message ? <p className="mt-2 text-xs font-bold text-orange-50">{message}</p> : null}
-    </form>
+    <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+      <form onSubmit={resetPassword} className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <div className="flex items-center gap-2">
+          <User className="text-mypal-orange" size={22} />
+          <h2 className="text-2xl font-black text-[#2a211d]">Profile Settings</h2>
+        </div>
+        <div className="mt-5 rounded border border-orange-100 bg-orange-50 p-4">
+          <p className="font-black text-[#2a211d]">{user.name}</p>
+          <p className="text-sm font-semibold text-slate-600">{user.email}</p>
+          <p className="mt-2 text-xs font-black uppercase text-orange-700">{user.role}</p>
+        </div>
+        <Field label="New password" value={password} onChange={setPassword} type="password" />
+        <button disabled={saving || password.length < 6} className="mt-5 rounded bg-mypal-orange px-5 py-3 font-bold text-white disabled:opacity-50">
+          {saving ? "Updating..." : "Update password"}
+        </button>
+        {message ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{message}</p> : null}
+      </form>
+      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <h2 className="text-2xl font-black text-[#2a211d]">Access</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Use this page for personal account settings. Admin-only publishing, design, account, and stakeholder controls remain separated in the sidebar.</p>
+      </div>
+    </div>
   );
 }
 
@@ -500,6 +528,13 @@ function ReviewBoard({
 }) {
   const buckets: SubmissionStatus[] = ["submitted", "approved", "rejected", "draft"];
   const readiness = getReadiness(issue, submissions, departments);
+  const [busyAction, setBusyAction] = useState("");
+
+  async function act(id: string, patch: Partial<Submission>, label: string) {
+    setBusyAction(`${id}-${label}`);
+    await onPatch(id, patch);
+    setBusyAction("");
+  }
 
   return (
     <div className="space-y-6">
@@ -535,15 +570,19 @@ function ReviewBoard({
                       Show in PDF
                     </label>
                   </div>
-                  <input value={submission.sectionTitle} onChange={(event) => onPatch(submission.id, { sectionTitle: event.target.value })} className="mt-3 w-full rounded border border-transparent px-0 text-xl font-black text-[#2a211d] outline-none focus:border-orange-200 focus:px-2" />
-                  <input value={submission.headline} onChange={(event) => onPatch(submission.id, { headline: event.target.value })} className="mt-1 w-full rounded border border-transparent px-0 font-semibold text-slate-700 outline-none focus:border-orange-200 focus:px-2" />
-                  <textarea value={submission.intro} onChange={(event) => onPatch(submission.id, { intro: event.target.value })} rows={2} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 text-slate-600 outline-mypal-orange" />
-                  <input value={submission.reviewerNote ?? ""} onChange={(event) => onPatch(submission.id, { reviewerNote: event.target.value })} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm text-amber-800 outline-mypal-orange" placeholder="Reviewer note or rejection reason visible to contributor" />
+                  <input defaultValue={submission.sectionTitle} onBlur={(event) => onPatch(submission.id, { sectionTitle: event.target.value })} className="mt-3 w-full rounded border border-transparent px-0 text-xl font-black text-[#2a211d] outline-none focus:border-orange-200 focus:px-2" />
+                  <input defaultValue={submission.headline} onBlur={(event) => onPatch(submission.id, { headline: event.target.value })} className="mt-1 w-full rounded border border-transparent px-0 font-semibold text-slate-700 outline-none focus:border-orange-200 focus:px-2" />
+                  <textarea defaultValue={submission.intro} onBlur={(event) => onPatch(submission.id, { intro: event.target.value })} rows={2} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 text-slate-600 outline-mypal-orange" />
+                  <input defaultValue={submission.reviewerNote ?? ""} onBlur={(event) => onPatch(submission.id, { reviewerNote: event.target.value })} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm text-amber-800 outline-mypal-orange" placeholder="Reviewer note or rejection reason visible to contributor" />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => onPatch(submission.id, { status: "approved" })} className="rounded bg-emerald-600 p-2 text-white" aria-label="Approve"><CheckCircle2 size={18} /></button>
-                  <button onClick={() => onPatch(submission.id, { status: "rejected" })} className="rounded bg-rose-600 p-2 text-white" aria-label="Reject"><XCircle size={18} /></button>
-                  <input type="number" value={submission.sortOrder} onChange={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-16 rounded border border-orange-200 px-2 text-sm" aria-label="Sort order" />
+                  <button disabled={Boolean(busyAction)} onClick={() => act(submission.id, { status: "approved" }, "approve")} className="flex items-center gap-2 rounded bg-emerald-600 px-3 py-2 text-sm font-black text-white disabled:opacity-60" aria-label="Approve">
+                    <CheckCircle2 size={18} /> {busyAction === `${submission.id}-approve` ? "Approving..." : "Approve"}
+                  </button>
+                  <button disabled={Boolean(busyAction)} onClick={() => act(submission.id, { status: "rejected" }, "reject")} className="flex items-center gap-2 rounded bg-rose-600 px-3 py-2 text-sm font-black text-white disabled:opacity-60" aria-label="Reject">
+                    <XCircle size={18} /> {busyAction === `${submission.id}-reject` ? "Rejecting..." : "Reject"}
+                  </button>
+                  <input type="number" defaultValue={submission.sortOrder} onBlur={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-16 rounded border border-orange-200 px-2 text-sm" aria-label="Sort order" />
                 </div>
               </div>
             </div>
@@ -844,8 +883,11 @@ function DesignStudio({
                 </label>
                 <div className="mt-3 flex items-center gap-2">
                   <span className="text-xs font-bold text-orange-700">Order</span>
-                  <input type="number" value={submission.sortOrder} onChange={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-20 rounded border border-orange-200 px-2 py-1 text-sm" />
+                  <input type="number" defaultValue={submission.sortOrder} onBlur={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-20 rounded border border-orange-200 px-2 py-1 text-sm" />
                 </div>
+                <input defaultValue={submission.headline} onBlur={(event) => onPatch(submission.id, { headline: event.target.value })} className="mt-3 w-full rounded border border-orange-100 px-3 py-2 text-sm font-bold outline-mypal-orange" />
+                <textarea defaultValue={submission.intro} onBlur={(event) => onPatch(submission.id, { intro: event.target.value })} rows={4} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 outline-mypal-orange" />
+                <textarea defaultValue={submission.bullets.join("\n")} onBlur={(event) => onPatch(submission.id, { bullets: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} rows={4} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 outline-mypal-orange" />
               </div>
             ))}
           </div>
@@ -1033,11 +1075,63 @@ function AccountsPanel({ users, departments, onCreated }: { users: AppUser[]; de
   );
 }
 
+function StakeholderPanel({ settings, onSaved }: { settings: AdminSettings; onSaved: () => Promise<void> }) {
+  const [lines, setLines] = useState((settings.stakeholders ?? []).map((item) => `${item.name}, ${item.email}, ${item.group}, ${item.whatsappSubscriberId ?? ""}`).join("\n"));
+  const [message, setMessage] = useState("");
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    const stakeholders = lines.split("\n").map((line, index) => {
+      const [name, email, group, whatsappSubscriberId] = line.split(",").map((item) => item.trim());
+      return { id: `stakeholder-${index}`, name, email, group: group || "Stakeholder", whatsappSubscriberId };
+    }).filter((item) => item.name && item.email);
+
+    const response = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...settings, stakeholders })
+    });
+
+    if (!response.ok) {
+      setMessage("Could not save stakeholders. Check email format.");
+      return;
+    }
+    setMessage(`Saved ${stakeholders.length} stakeholder(s).`);
+    await onSaved();
+  }
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[520px_1fr]">
+      <form onSubmit={save} className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <div className="flex items-center gap-2">
+          <Send className="text-mypal-orange" size={22} />
+          <h2 className="text-2xl font-black text-[#2a211d]">Stakeholder Database</h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Admins can maintain the publishing audience here. Publish sends the latest generated PDF to this list.</p>
+        <TextArea label="Stakeholders" hint="One per line: Name, email, group, whatsappSubscriberId" value={lines} onChange={setLines} rows={12} />
+        <button className="mt-5 rounded bg-mypal-orange px-5 py-3 font-bold text-white">Save Stakeholders</button>
+        {message ? <p className="mt-4 rounded bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800">{message}</p> : null}
+      </form>
+      <div className="rounded-lg border border-orange-100 bg-white p-6 shadow-soft">
+        <h2 className="text-2xl font-black text-[#2a211d]">Current List</h2>
+        <div className="mt-4 grid gap-3">
+          {(settings.stakeholders ?? []).length ? settings.stakeholders.map((stakeholder) => (
+            <div key={stakeholder.id} className="rounded border border-orange-100 px-4 py-3">
+              <p className="font-black text-[#2a211d]">{stakeholder.name}</p>
+              <p className="text-sm font-semibold text-slate-600">{stakeholder.email}</p>
+              <p className="mt-1 text-xs font-black uppercase text-orange-700">{stakeholder.group}</p>
+            </div>
+          )) : <p className="text-sm text-slate-500">No stakeholders added yet.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminSettings; onSaved: () => Promise<void>; compact?: boolean }) {
   const [form, setForm] = useState(settings);
   const [noteRole, setNoteRole] = useState(noteRoles.includes(settings.leadership.designation) ? settings.leadership.designation : "Other");
   const [socialLines, setSocialLines] = useState((settings.socialLinks ?? []).map((item) => `${item.label}: ${item.url}`).join("\n"));
-  const [stakeholderLines, setStakeholderLines] = useState((settings.stakeholders ?? []).map((item) => `${item.name}, ${item.email}, ${item.group}, ${item.whatsappSubscriberId ?? ""}`).join("\n"));
   const [saved, setSaved] = useState(false);
 
   async function save(event: FormEvent) {
@@ -1048,10 +1142,7 @@ function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminS
         const [label, ...url] = line.split(":");
         return { id: `social-${index}`, label: label.trim(), url: url.join(":").trim() };
       }).filter((item) => item.label && item.url),
-      stakeholders: stakeholderLines.split("\n").map((line, index) => {
-        const [name, email, group, whatsappSubscriberId] = line.split(",").map((item) => item.trim());
-        return { id: `stakeholder-${index}`, name, email, group: group || "Stakeholder", whatsappSubscriberId };
-      }).filter((item) => item.name && item.email)
+      stakeholders: form.stakeholders ?? []
     };
     await fetch("/api/settings", {
       method: "PUT",
@@ -1075,7 +1166,6 @@ function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminS
         <Field label="QR code image URL" value={form.qrCodeUrl} onChange={(value) => setForm({ ...form, qrCodeUrl: value })} />
       </div>
       <TextArea label="Clickable social links" hint="One per line. Format: Instagram: https://..." value={socialLines} onChange={setSocialLines} rows={compact ? 4 : 5} />
-      {!compact ? <TextArea label="Stakeholder email database" hint="One per line. Format: Name, email, group, whatsappSubscriberId" value={stakeholderLines} onChange={setStakeholderLines} rows={5} /> : null}
 
       <h3 className="mt-8 text-xl font-black text-[#2a211d]">Main Note Author</h3>
       <div className={compact ? "grid gap-3" : "grid gap-5 md:grid-cols-2"}>

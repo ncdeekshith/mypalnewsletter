@@ -1,4 +1,11 @@
-import type { AdminSettings, NewsletterIssue, Submission } from "@/lib/types";
+import type { AdminSettings, NewsletterIssue, Submission, SubmissionImage, SubmissionMetric } from "@/lib/types";
+
+type SectionChunk = {
+  intro: string;
+  bullets: string[];
+  metrics: SubmissionMetric[];
+  images: SubmissionImage[];
+};
 
 export function NewsletterPreview({
   settings,
@@ -20,6 +27,7 @@ export function NewsletterPreview({
     value: String(item.bullets.length),
     section: "Updates"
   }));
+  let sectionPageNumber = 3;
 
   return (
     <article className="newsletter-doc mx-auto">
@@ -98,7 +106,7 @@ export function NewsletterPreview({
           <div>
             <h3 className="text-2xl font-black text-[#2a211d]">Snapshot</h3>
             <div className="mt-4 grid max-h-[520px] gap-3 overflow-hidden">
-              {snapshot.length ? snapshot.slice(0, 10).map((metric) => (
+              {snapshot.length ? snapshot.slice(0, 4).map((metric) => (
                 <div key={`${metric.section}-${metric.label}-${metric.value}`} className="rounded bg-[#2a211d] p-4 text-white">
                   <p className="text-2xl font-black text-mypal-orange">{metric.value}</p>
                   <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-white/70">{metric.label}</p>
@@ -116,9 +124,22 @@ export function NewsletterPreview({
         <PageFooter settings={settings} page="02" />
       </Page>
 
-      {approved.map((submission, index) => (
-        <SectionPage key={submission.id} settings={settings} issue={issue} submission={submission} pageNumber={String(index + 3).padStart(2, "0")} />
-      ))}
+      {approved.flatMap((submission) => {
+        const chunks = buildSectionChunks(submission);
+        const startPage = sectionPageNumber;
+        sectionPageNumber += chunks.length;
+        return chunks.map((chunk, index) => (
+          <SectionPage
+            key={`${submission.id}-${index}`}
+            settings={settings}
+            issue={issue}
+            submission={submission}
+            chunk={chunk}
+            continuation={index > 0}
+            pageNumber={String(startPage + index).padStart(2, "0")}
+          />
+        ));
+      })}
 
       <Page className="dark-page text-white">
         <div className="flex h-full flex-col justify-between">
@@ -152,68 +173,73 @@ function SectionPage({
   settings,
   issue,
   submission,
+  chunk,
+  continuation,
   pageNumber
 }: {
   settings: AdminSettings;
   issue: NewsletterIssue;
   submission: Submission;
+  chunk: SectionChunk;
+  continuation: boolean;
   pageNumber: string;
 }) {
-  const hero = submission.images[0];
-  const gallery = submission.images.slice(1);
+  const hero = chunk.images[0];
 
   return (
     <Page>
       <PageHeader settings={settings} issue={issue} label={submission.sectionTitle} />
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-7">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-mypal-orange">{submission.departmentId.replace("custom-", "custom")}</p>
-          <h2 className="mt-2 text-4xl font-black leading-tight text-[#2a211d]">{submission.sectionTitle}</h2>
-          <h3 className="mt-5 text-2xl font-black leading-snug text-[#2a211d]">{submission.headline}</h3>
-          <p className="mt-4 text-base leading-7 text-slate-700">{submission.intro}</p>
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            {submission.metrics.slice(0, 3).map((metric) => (
+      <div className="newsletter-content">
+        <div className={hero && !continuation ? "grid grid-cols-[1fr_260px] gap-7" : "grid gap-5"}>
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-mypal-orange">{submission.departmentId.replace("custom-", "custom")}</p>
+            <h2 className="mt-2 text-3xl font-black leading-tight text-[#2a211d]">{submission.sectionTitle}{continuation ? " continued" : ""}</h2>
+            {!continuation ? <h3 className="mt-3 text-xl font-black leading-snug text-[#2a211d]">{submission.headline}</h3> : null}
+            {chunk.intro ? <p className="mt-4 whitespace-pre-line text-[14px] leading-6 text-slate-700">{chunk.intro}</p> : null}
+          </div>
+          {hero && !continuation ? (
+            <figure className="overflow-hidden rounded bg-[#fff8f1] shadow-soft">
+              <img src={hero.url} alt={hero.caption} className="h-52 w-full object-cover" />
+              <figcaption className="px-3 py-2 text-xs font-black text-[#2a211d]">{hero.caption}</figcaption>
+            </figure>
+          ) : null}
+        </div>
+
+        {chunk.metrics.length ? (
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            {chunk.metrics.map((metric) => (
               <div key={metric.label} className="rounded bg-[#fff4eb] p-3 text-center">
-                <p className="text-2xl font-black text-mypal-orange">{metric.value}</p>
+                <p className="text-xl font-black text-mypal-orange">{metric.value || "-"}</p>
                 <p className="mt-1 text-[10px] font-black uppercase leading-tight text-slate-500">{metric.label}</p>
               </div>
             ))}
           </div>
-        </div>
-        {hero ? (
-          <figure className="overflow-hidden rounded-lg bg-[#fff8f1] shadow-soft">
-            <img src={hero.url} alt={hero.caption} className="h-[300px] w-full object-cover" />
-            <figcaption className="px-4 py-3 text-sm font-black text-[#2a211d]">{hero.caption}</figcaption>
-          </figure>
-        ) : (
-          <div className="rounded-lg bg-[#2a211d] p-7 text-white shadow-soft">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-mypal-orange">Text Feature</p>
-            <p className="mt-5 text-3xl font-black leading-tight">{submission.headline}</p>
-            <p className="mt-5 text-sm font-semibold leading-7 text-white/75">This section was submitted without photos, so the PDF uses a clean editorial layout focused on outcomes and proof points.</p>
-          </div>
-        )}
-      </div>
+        ) : null}
 
-      <div className={`mt-7 grid gap-7 ${gallery.length ? "grid-cols-[1fr_1fr]" : "grid-cols-1"}`}>
-        <div>
-          <h4 className="mb-3 text-lg font-black text-[#2a211d]">Key updates</h4>
-          <ul className="grid gap-3">
-            {submission.bullets.slice(0, 5).map((bullet) => (
-              <li key={bullet} className="flex gap-3 rounded border border-orange-100 bg-white p-3 text-sm font-semibold leading-6 text-slate-700">
-                <span className="mt-2 h-2 w-2 flex-none rounded-full bg-mypal-orange" />
-                <span>{bullet}</span>
-              </li>
+        {chunk.bullets.length ? (
+          <div className="mt-5">
+            <h4 className="mb-3 text-base font-black text-[#2a211d]">Key updates</h4>
+            <ul className="grid gap-2">
+              {chunk.bullets.map((bullet) => (
+                <li key={bullet} className="flex gap-3 rounded border border-orange-100 bg-white p-3 text-[13px] font-semibold leading-5 text-slate-700">
+                  <span className="mt-2 h-2 w-2 flex-none rounded-full bg-mypal-orange" />
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {chunk.images.slice(hero && !continuation ? 1 : 0).length ? (
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            {chunk.images.slice(hero && !continuation ? 1 : 0).map((image) => (
+              <figure key={image.id} className="overflow-hidden rounded bg-[#fff8f1]">
+                <img src={image.url} alt={image.caption} className="h-28 w-full object-cover" />
+                <figcaption className="px-3 py-2 text-xs font-black leading-4 text-[#2a211d]">{image.caption}</figcaption>
+              </figure>
             ))}
-          </ul>
-        </div>
-        {gallery.length ? <div className="grid gap-3">
-          {gallery.slice(0, 4).map((image) => (
-            <figure key={image.id} className="grid grid-cols-[120px_1fr] overflow-hidden rounded bg-[#fff8f1]">
-              <img src={image.url} alt={image.caption} className="h-24 w-full object-cover" />
-              <figcaption className="flex items-center px-4 text-sm font-black leading-5 text-[#2a211d]">{image.caption}</figcaption>
-            </figure>
-          ))}
-        </div> : null}
+          </div>
+        ) : null}
       </div>
       <PageFooter settings={settings} page={pageNumber} />
     </Page>
@@ -242,7 +268,7 @@ function PageHeader({ settings, issue, label }: { settings: AdminSettings; issue
 function PageFooter({ settings, page }: { settings: AdminSettings; page: string }) {
   return (
     <footer className="absolute bottom-8 left-10 right-10 flex items-center justify-between border-t border-orange-100 pt-4 text-xs font-bold text-slate-500">
-      <span>{settings.socialHandle} • <a href={settings.websiteUrl}>{settings.websiteUrl}</a></span>
+      <span>myPAL Internal Newsletter • <a href={settings.websiteUrl}>{settings.websiteUrl}</a></span>
       <span>{page}</span>
     </footer>
   );
@@ -260,6 +286,40 @@ function SocialLinks({ settings, theme }: { settings: AdminSettings; theme: "lig
       ))}
     </div>
   );
+}
+
+function buildSectionChunks(submission: Submission): SectionChunk[] {
+  const hasImages = submission.images.length > 0;
+  const introChunks = chunkWords(submission.intro, hasImages ? 90 : 135);
+  const bulletChunks = chunkArray(submission.bullets, hasImages ? 4 : 5);
+  const imageChunks = chunkArray(submission.images, 3);
+  const pageCount = Math.max(1, introChunks.length, bulletChunks.length, imageChunks.length);
+
+  return Array.from({ length: pageCount }, (_, index) => ({
+    intro: introChunks[index] ?? "",
+    bullets: bulletChunks[index] ?? [],
+    metrics: index === 0 ? submission.metrics.slice(0, 3) : [],
+    images: imageChunks[index] ?? []
+  }));
+}
+
+function chunkWords(value: string, wordsPerChunk: number) {
+  const words = value.split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const chunks: string[] = [];
+  for (let index = 0; index < words.length; index += wordsPerChunk) {
+    chunks.push(words.slice(index, index + wordsPerChunk).join(" "));
+  }
+  return chunks;
+}
+
+function chunkArray<T>(items: T[], size: number) {
+  if (!items.length) return [];
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function formatIssueDate(date: string) {
