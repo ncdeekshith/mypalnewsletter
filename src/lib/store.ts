@@ -19,7 +19,17 @@ async function ensureStore() {
 export async function readDatabase(): Promise<NewsletterDatabase> {
   await ensureStore();
   const raw = await fs.readFile(dataPath, "utf8");
-  return JSON.parse(raw) as NewsletterDatabase;
+  if (!raw.trim()) {
+    await writeDatabase(seedDatabase);
+    return seedDatabase;
+  }
+
+  try {
+    return JSON.parse(raw) as NewsletterDatabase;
+  } catch {
+    await writeDatabase(seedDatabase);
+    return seedDatabase;
+  }
 }
 
 export async function writeDatabase(database: NewsletterDatabase) {
