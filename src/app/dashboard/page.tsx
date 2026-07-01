@@ -805,7 +805,14 @@ function DropZone({ label, value, onChange }: { label: string; value: string; on
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    onChange(await fileToDataUrl(file));
+    const dataUrl = await fileToDataUrl(file);
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl, folder: "newsletter-images" })
+    });
+    const payload = await response.json();
+    onChange(payload.url ?? dataUrl);
   }
 
   return (

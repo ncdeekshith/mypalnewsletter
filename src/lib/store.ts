@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
 import { seedDatabase } from "@/lib/seed";
+import { firebaseEnabled } from "@/lib/firebase";
+import { readFirebaseDatabase, writeFirebaseDatabase } from "@/lib/firebase-store";
 import type { AdminSettings, AppUser, GeneratedPdf, NewsletterDatabase, NewsletterIssue, Submission, SubmissionImage } from "@/lib/types";
 
 const dataDir = path.join(process.cwd(), "data");
@@ -17,6 +19,14 @@ async function ensureStore() {
 }
 
 export async function readDatabase(): Promise<NewsletterDatabase> {
+  if (firebaseEnabled()) {
+    try {
+      return await readFirebaseDatabase();
+    } catch (error) {
+      console.warn("Firebase read failed; falling back to local store.", error);
+    }
+  }
+
   await ensureStore();
   const raw = await fs.readFile(dataPath, "utf8");
   if (!raw.trim()) {
@@ -33,6 +43,15 @@ export async function readDatabase(): Promise<NewsletterDatabase> {
 }
 
 export async function writeDatabase(database: NewsletterDatabase) {
+  if (firebaseEnabled()) {
+    try {
+      await writeFirebaseDatabase(database);
+      return;
+    } catch (error) {
+      console.warn("Firebase write failed; falling back to local store.", error);
+    }
+  }
+
   await ensureStore();
   await fs.writeFile(dataPath, JSON.stringify(database, null, 2));
 }

@@ -32,7 +32,16 @@ Open `http://localhost:3000`.
 
 ## Production Notes
 
-The MVP uses a local JSON store at `data/newsletter-db.json` so it runs immediately. For production, create the Supabase tables from `supabase/schema.sql`, add Supabase environment variables, and replace the store adapter in `src/lib/store.ts` with Supabase queries while keeping the same domain types.
+The app is wired to Firebase using the myPAL project config in `.env.example`. Firestore stores the newsletter database document and Firebase Storage stores uploaded photos. If Firebase is unavailable or rules are locked, the app falls back to the local JSON store at `data/newsletter-db.json` so development still works.
+
+Set these when deploying:
+
+```bash
+FIREBASE_ENABLED=true
+NEXT_PUBLIC_FIREBASE_ENABLED=true
+```
+
+Create Firestore rules and Storage rules appropriate for your internal auth model before production rollout.
 
 PDF export requires a server runtime where Playwright Chromium can run. The generated file name follows:
 

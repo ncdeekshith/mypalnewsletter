@@ -26,12 +26,59 @@ select {
   font: inherit;
 }
 
+.newsletter-doc {
+  width: 210mm;
+  background: #ffffff;
+}
+
+.newsletter-page {
+  width: 210mm;
+  height: 297mm;
+  padding: 18mm 16mm;
+  break-after: page;
+  page-break-after: always;
+}
+
+.newsletter-page:not(.cover-page):not(.dark-page) {
+  background: #ffffff;
+}
+
+.newsletter-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+.cover-page {
+  padding: 20mm 18mm;
+  background: #f47b20;
+}
+
+.dark-page {
+  background: #2a211d;
+}
+
 @media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html,
   body {
     background: #ffffff;
+    margin: 0;
   }
 
   .no-print {
     display: none !important;
+  }
+
+  .newsletter-doc {
+    width: 210mm;
+    box-shadow: none !important;
+  }
+
+  .newsletter-page {
+    box-shadow: none !important;
   }
 }
