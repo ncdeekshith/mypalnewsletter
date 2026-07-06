@@ -503,7 +503,7 @@ function SubmissionPreview({ form, department }: { form: ReturnType<typeof formF
             {bullets.slice(0, 3).map((bullet) => <li key={bullet} className="text-sm font-semibold text-slate-700">• {bullet}</li>)}
           </ul>
         </div>
-        {images[0] ? <img src={images[0].url} alt={images[0].caption || "Preview photo"} className="h-40 w-full rounded object-cover" /> : <div className="grid h-40 place-items-center rounded border border-dashed border-orange-200 bg-white text-center text-sm font-bold text-orange-700">No photo selected. PDF will use a clean text layout.</div>}
+        {images[0] ? <img src={images[0].url} alt={images[0].caption || "Preview photo"} className="h-40 w-full rounded bg-white object-contain" /> : <div className="grid h-40 place-items-center rounded border border-dashed border-orange-200 bg-white text-center text-sm font-bold text-orange-700">No photo selected. PDF will use a clean text layout.</div>}
       </div>
     </div>
   );
@@ -574,6 +574,7 @@ function ReviewBoard({
                   <input defaultValue={submission.headline} onBlur={(event) => onPatch(submission.id, { headline: event.target.value })} className="mt-1 w-full rounded border border-transparent px-0 font-semibold text-slate-700 outline-none focus:border-orange-200 focus:px-2" />
                   <textarea defaultValue={submission.intro} onBlur={(event) => onPatch(submission.id, { intro: event.target.value })} rows={2} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 text-slate-600 outline-mypal-orange" />
                   <input defaultValue={submission.reviewerNote ?? ""} onBlur={(event) => onPatch(submission.id, { reviewerNote: event.target.value })} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm text-amber-800 outline-mypal-orange" placeholder="Reviewer note or rejection reason visible to contributor" />
+                  <SubmissionPdfControls submission={submission} onPatch={onPatch} />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button disabled={Boolean(busyAction)} onClick={() => act(submission.id, { status: "approved" }, "approve")} className="flex items-center gap-2 rounded bg-emerald-600 px-3 py-2 text-sm font-black text-white disabled:opacity-60" aria-label="Approve">
@@ -601,6 +602,75 @@ function ReviewBoard({
           )) : <p className="text-sm text-slate-500">No PDFs generated yet.</p>}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SubmissionPdfControls({
+  submission,
+  onPatch,
+  compact = false
+}: {
+  submission: Submission;
+  onPatch: (id: string, patch: Partial<Submission>) => Promise<void>;
+  compact?: boolean;
+}) {
+  const options = submission.pdfOptions ?? { imageFit: "contain" as const, spacing: "standard" as const };
+
+  function patchOptions(patch: Partial<NonNullable<Submission["pdfOptions"]>>) {
+    void onPatch(submission.id, { pdfOptions: { ...options, ...patch } });
+  }
+
+  function updateImage(imageId: string, patch: Partial<SubmissionImage>) {
+    void onPatch(submission.id, {
+      images: submission.images.map((image) => image.id === imageId ? { ...image, ...patch } : image)
+    });
+  }
+
+  function removeImage(imageId: string) {
+    void onPatch(submission.id, {
+      images: submission.images.filter((image) => image.id !== imageId)
+    });
+  }
+
+  return (
+    <div className={`${compact ? "mt-3" : "mt-4"} rounded border border-orange-100 bg-orange-50/40 p-3`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700">PDF layout controls</p>
+        <p className="text-xs font-bold text-slate-500">{submission.images.length} photo{submission.images.length === 1 ? "" : "s"}</p>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <label className="text-xs font-bold text-slate-600">
+          Image display
+          <select value={options.imageFit} onChange={(event) => patchOptions({ imageFit: event.target.value as "contain" | "cover" })} className="mt-1 w-full rounded border border-orange-100 bg-white px-2 py-2 text-sm text-[#2a211d] outline-mypal-orange">
+            <option value="contain">Full image, no crop</option>
+            <option value="cover">Crop to fill card</option>
+          </select>
+        </label>
+        <label className="text-xs font-bold text-slate-600">
+          Section spacing
+          <select value={options.spacing} onChange={(event) => patchOptions({ spacing: event.target.value as "compact" | "standard" | "airy" })} className="mt-1 w-full rounded border border-orange-100 bg-white px-2 py-2 text-sm text-[#2a211d] outline-mypal-orange">
+            <option value="compact">Compact: reduce white space</option>
+            <option value="standard">Standard</option>
+            <option value="airy">Airy: more breathing room</option>
+          </select>
+        </label>
+      </div>
+      {submission.images.length ? (
+        <div className={`mt-3 grid gap-2 ${compact ? "" : "md:grid-cols-2"}`}>
+          {submission.images.map((image) => (
+            <div key={image.id} className="grid grid-cols-[72px_1fr_auto] items-center gap-2 rounded bg-white p-2">
+              <img src={image.url} alt={image.caption || "Submission photo"} className="h-14 w-[72px] rounded border border-orange-100 object-contain" />
+              <input value={image.caption} onChange={(event) => updateImage(image.id, { caption: event.target.value })} className="min-w-0 rounded border border-orange-100 px-2 py-1 text-xs outline-mypal-orange" placeholder="Caption" />
+              <button type="button" onClick={() => removeImage(image.id)} className="rounded border border-rose-100 bg-rose-50 p-2 text-rose-700" aria-label="Remove photo">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded bg-white px-3 py-2 text-xs font-bold text-slate-500">No photos in this section. The PDF will use a text-first layout.</p>
+      )}
     </div>
   );
 }
@@ -888,6 +958,7 @@ function DesignStudio({
                 <input defaultValue={submission.headline} onBlur={(event) => onPatch(submission.id, { headline: event.target.value })} className="mt-3 w-full rounded border border-orange-100 px-3 py-2 text-sm font-bold outline-mypal-orange" />
                 <textarea defaultValue={submission.intro} onBlur={(event) => onPatch(submission.id, { intro: event.target.value })} rows={4} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 outline-mypal-orange" />
                 <textarea defaultValue={submission.bullets.join("\n")} onBlur={(event) => onPatch(submission.id, { bullets: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} rows={4} className="mt-2 w-full rounded border border-orange-100 px-3 py-2 text-sm leading-6 outline-mypal-orange" />
+                <SubmissionPdfControls submission={submission} onPatch={onPatch} compact />
               </div>
             ))}
           </div>
@@ -1236,7 +1307,7 @@ function DropZone({ label, value, onChange }: { label: string; value: string; on
       }}
       className="mt-2 flex min-h-36 cursor-pointer flex-col items-center justify-center overflow-hidden rounded border-2 border-dashed border-orange-200 bg-white p-4 text-center transition hover:border-mypal-orange"
     >
-      {value ? <img src={value} alt={label} className="mb-3 h-28 w-full rounded object-cover" /> : <UploadCloud className="mb-2 text-mypal-orange" size={28} />}
+      {value ? <img src={value} alt={label} className="mb-3 h-28 w-full rounded bg-white object-contain" /> : <UploadCloud className="mb-2 text-mypal-orange" size={28} />}
       <span className="text-sm font-black text-[#2a211d]">{label}</span>
       <span className="mt-1 text-xs text-orange-700">Drag and drop, or click to upload</span>
       <input type="file" accept="image/*" className="hidden" onChange={(event) => void handleFiles(event.target.files)} />
@@ -1321,7 +1392,7 @@ function getReadiness(issue: NewsletterIssue, submissions: Submission[], departm
   const requiredSubmitted = requiredDepartments.filter((department) =>
     submissions.some((submission) => submission.departmentId === department.id && submission.status !== "draft")
   ).length;
-  const imageReady = visibleSubmissions.filter((submission) => submission.images.every((image) => image.url && image.caption)).length;
+  const imageReady = visibleSubmissions.filter((submission) => submission.images.every((image) => image.url)).length;
   const blockers: string[] = [];
 
   requiredDepartments.forEach((department) => {

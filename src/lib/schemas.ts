@@ -17,6 +17,10 @@ export const submissionSchema = z.object({
   bullets: z.array(z.string()).default([]),
   metrics: z.array(z.object({ label: z.string(), value: z.string() })).default([]),
   images: z.array(imageSchema).default([]),
+  pdfOptions: z.object({
+    imageFit: z.enum(["contain", "cover"]).default("contain"),
+    spacing: z.enum(["compact", "standard", "airy"]).default("standard")
+  }).default({ imageFit: "contain", spacing: "standard" }),
   status: z.enum(["draft", "submitted", "approved", "rejected", "published"]).default("draft"),
   visible: z.boolean().default(true),
   sortOrder: z.number().default(10),

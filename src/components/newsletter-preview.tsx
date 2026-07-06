@@ -185,28 +185,36 @@ function SectionPage({
   pageNumber: string;
 }) {
   const hero = chunk.images[0];
+  const options = getPdfOptions(submission);
+  const compact = options.spacing === "compact";
+  const airy = options.spacing === "airy";
+  const imageFitClass = options.imageFit === "cover" ? "object-cover" : "object-contain";
+  const topGridClass = hero && !continuation ? "grid grid-cols-[1fr_300px] gap-6" : "grid gap-4";
+  const sectionGap = compact ? "mt-3" : airy ? "mt-7" : "mt-5";
 
   return (
     <Page>
       <PageHeader settings={settings} issue={issue} label={submission.sectionTitle} />
       <div className="newsletter-content">
-        <div className={hero && !continuation ? "grid grid-cols-[1fr_260px] gap-7" : "grid gap-5"}>
+        <div className={topGridClass}>
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-mypal-orange">{submission.departmentId.replace("custom-", "custom")}</p>
             <h2 className="mt-2 text-3xl font-black leading-tight text-[#2a211d]">{submission.sectionTitle}{continuation ? " continued" : ""}</h2>
-            {!continuation ? <h3 className="mt-3 text-xl font-black leading-snug text-[#2a211d]">{submission.headline}</h3> : null}
-            {chunk.intro ? <p className="mt-4 whitespace-pre-line text-[14px] leading-6 text-slate-700">{chunk.intro}</p> : null}
+            {!continuation && submission.headline ? <h3 className={compact ? "mt-2 text-lg font-black leading-snug text-[#2a211d]" : "mt-3 text-xl font-black leading-snug text-[#2a211d]"}>{submission.headline}</h3> : null}
+            {chunk.intro ? <p className={`${compact ? "mt-3 text-[13px] leading-5" : "mt-4 text-[14px] leading-6"} whitespace-pre-line text-slate-700`}>{chunk.intro}</p> : null}
           </div>
           {hero && !continuation ? (
             <figure className="overflow-hidden rounded bg-[#fff8f1] shadow-soft">
-              <img src={hero.url} alt={hero.caption} className="h-52 w-full object-cover" />
-              <figcaption className="px-3 py-2 text-xs font-black text-[#2a211d]">{hero.caption}</figcaption>
+              <div className="grid h-56 w-full place-items-center bg-white">
+                <img src={hero.url} alt={hero.caption || submission.sectionTitle} className={`max-h-full max-w-full ${imageFitClass}`} />
+              </div>
+              {hero.caption ? <figcaption className="px-3 py-2 text-xs font-black text-[#2a211d]">{hero.caption}</figcaption> : null}
             </figure>
           ) : null}
         </div>
 
         {chunk.metrics.length ? (
-          <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className={`${sectionGap} grid grid-cols-3 gap-3`}>
             {chunk.metrics.map((metric) => (
               <div key={metric.label} className="rounded bg-[#fff4eb] p-3 text-center">
                 <p className="text-xl font-black text-mypal-orange">{metric.value || "-"}</p>
@@ -217,11 +225,11 @@ function SectionPage({
         ) : null}
 
         {chunk.bullets.length ? (
-          <div className="mt-5">
-            <h4 className="mb-3 text-base font-black text-[#2a211d]">Key updates</h4>
-            <ul className="grid gap-2">
+          <div className={sectionGap}>
+            <h4 className={`${compact ? "mb-2" : "mb-3"} text-base font-black text-[#2a211d]`}>Key updates</h4>
+            <ul className={`grid ${compact ? "gap-1.5" : "gap-2"}`}>
               {chunk.bullets.map((bullet) => (
-                <li key={bullet} className="flex gap-3 rounded border border-orange-100 bg-white p-3 text-[13px] font-semibold leading-5 text-slate-700">
+                <li key={bullet} className={`flex gap-3 rounded border border-orange-100 bg-white ${compact ? "p-2 text-[12px] leading-4" : "p-3 text-[13px] leading-5"} font-semibold text-slate-700`}>
                   <span className="mt-2 h-2 w-2 flex-none rounded-full bg-mypal-orange" />
                   <span>{bullet}</span>
                 </li>
@@ -231,11 +239,13 @@ function SectionPage({
         ) : null}
 
         {chunk.images.slice(hero && !continuation ? 1 : 0).length ? (
-          <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className={`${sectionGap} grid grid-cols-2 gap-3`}>
             {chunk.images.slice(hero && !continuation ? 1 : 0).map((image) => (
               <figure key={image.id} className="overflow-hidden rounded bg-[#fff8f1]">
-                <img src={image.url} alt={image.caption} className="h-28 w-full object-cover" />
-                <figcaption className="px-3 py-2 text-xs font-black leading-4 text-[#2a211d]">{image.caption}</figcaption>
+                <div className="grid h-36 w-full place-items-center bg-white">
+                  <img src={image.url} alt={image.caption || submission.sectionTitle} className={`max-h-full max-w-full ${imageFitClass}`} />
+                </div>
+                {image.caption ? <figcaption className="px-3 py-2 text-xs font-black leading-4 text-[#2a211d]">{image.caption}</figcaption> : null}
               </figure>
             ))}
           </div>
@@ -290,9 +300,12 @@ function SocialLinks({ settings, theme }: { settings: AdminSettings; theme: "lig
 
 function buildSectionChunks(submission: Submission): SectionChunk[] {
   const hasImages = submission.images.length > 0;
-  const introChunks = chunkWords(submission.intro, hasImages ? 90 : 135);
-  const bulletChunks = chunkArray(submission.bullets, hasImages ? 4 : 5);
-  const imageChunks = chunkArray(submission.images, 3);
+  const options = getPdfOptions(submission);
+  const compact = options.spacing === "compact";
+  const airy = options.spacing === "airy";
+  const introChunks = chunkWords(submission.intro, hasImages ? (compact ? 115 : airy ? 70 : 90) : (compact ? 175 : airy ? 105 : 135));
+  const bulletChunks = chunkArray(submission.bullets, hasImages ? (compact ? 6 : airy ? 3 : 4) : (compact ? 8 : airy ? 4 : 5));
+  const imageChunks = chunkArray(submission.images, compact ? 4 : 3);
   const pageCount = Math.max(1, introChunks.length, bulletChunks.length, imageChunks.length);
 
   return Array.from({ length: pageCount }, (_, index) => ({
@@ -301,6 +314,10 @@ function buildSectionChunks(submission: Submission): SectionChunk[] {
     metrics: index === 0 ? submission.metrics.slice(0, 3) : [],
     images: imageChunks[index] ?? []
   }));
+}
+
+function getPdfOptions(submission: Submission) {
+  return submission.pdfOptions ?? { imageFit: "contain" as const, spacing: "standard" as const };
 }
 
 function chunkWords(value: string, wordsPerChunk: number) {

@@ -41,6 +41,11 @@ export type SubmissionImage = {
   caption: string;
 };
 
+export type SubmissionPdfOptions = {
+  imageFit: "contain" | "cover";
+  spacing: "compact" | "standard" | "airy";
+};
+
 export type SubmissionMetric = {
   label: string;
   value: string;
@@ -57,6 +62,7 @@ export type Submission = {
   bullets: string[];
   metrics: SubmissionMetric[];
   images: SubmissionImage[];
+  pdfOptions?: SubmissionPdfOptions;
   status: SubmissionStatus;
   visible: boolean;
   sortOrder: number;

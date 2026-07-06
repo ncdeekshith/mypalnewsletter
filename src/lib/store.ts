@@ -83,6 +83,7 @@ export async function upsertSubmission(input: SubmissionInput) {
       url: image.url,
       caption: image.caption
     })),
+    pdfOptions: input.pdfOptions ?? { imageFit: "contain", spacing: "standard" },
     status: input.status ?? "draft",
     visible: input.visible ?? true,
     sortOrder: input.sortOrder ?? department?.sortOrder ?? database.submissions.length + 1,
@@ -269,6 +270,10 @@ export async function markNotificationRead(id: string, userId: string) {
 
 function normalizeDatabase(database: NewsletterDatabase): NewsletterDatabase {
   const users = (database.users ?? seedDatabase.users).map((user) => ({ ...user, active: user.active ?? true }));
+  const submissions = (database.submissions ?? seedDatabase.submissions).map((submission) => ({
+    ...submission,
+    pdfOptions: submission.pdfOptions ?? { imageFit: "contain" as const, spacing: "standard" as const }
+  }));
   const mainAdmin = seedDatabase.users.find((user) => user.email === "deekshith.nc@arivulearn.com");
   if (mainAdmin && !users.some((user) => user.email.toLowerCase() === mainAdmin.email.toLowerCase())) {
     users.unshift({ ...mainAdmin, active: true });
@@ -278,6 +283,7 @@ function normalizeDatabase(database: NewsletterDatabase): NewsletterDatabase {
     ...seedDatabase,
     ...database,
     users,
+    submissions,
     settings: {
       ...seedDatabase.settings,
       ...database.settings,
