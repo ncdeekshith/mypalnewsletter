@@ -1282,7 +1282,10 @@ function formFromSubmission(submission: Submission | undefined, department: Depa
 }
 
 function formatSubmissionError(data: unknown) {
-  if (!data || typeof data !== "object" || !("errors" in data)) return "";
+  if (!data || typeof data !== "object") return "";
+  if ("message" in data && typeof data.message === "string") return data.message;
+  if ("error" in data && typeof data.error === "string") return data.error;
+  if (!("errors" in data)) return "";
   const errors = (data as { errors?: { fieldErrors?: Record<string, string[]>; formErrors?: string[] } }).errors;
   const fieldErrors = errors?.fieldErrors ?? {};
   return Object.entries(fieldErrors)
