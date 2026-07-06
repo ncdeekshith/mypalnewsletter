@@ -1,7 +1,9 @@
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 import { firebaseEnabled } from "@/lib/firebase";
-import { uploadFirebaseDataUrl } from "@/lib/firebase-store";
+import { saveFirebaseUpload, uploadFirebaseDataUrl } from "@/lib/firebase-store";
+
+const firestoreUploadLimit = 850_000;
 
 export async function POST(request: Request) {
   const { dataUrl, folder = "uploads" } = (await request.json()) as { dataUrl?: string; folder?: string };
@@ -19,12 +21,28 @@ export async function POST(request: Request) {
     const url = await uploadFirebaseDataUrl(dataUrl, storagePath);
     return NextResponse.json({ url, storagePath, mode: "firebase" });
   } catch (error) {
-    console.warn("Firebase upload failed; using local data URL fallback.", error);
-    return NextResponse.json({
-      url: dataUrl,
-      storagePath: null,
-      mode: "local-fallback",
-      warning: "Firebase upload failed. Check Firebase Storage rules or credentials."
-    });
+    console.warn("Firebase Storage upload failed; using Firestore upload record.", error);
+    if (dataUrl.length > firestoreUploadLimit) {
+      return NextResponse.json(
+        { message: "Photo is too large for the current Firebase setup. Please upload a smaller or compressed image." },
+        { status: 413 }
+      );
+    }
+
+    const id = nanoid();
+    try {
+      await saveFirebaseUpload(id, dataUrl);
+      return NextResponse.json({
+        url: new URL(`/api/uploads/${id}`, request.url).toString(),
+        storagePath: `newsletter_uploads/${id}`,
+        mode: "firestore"
+      });
+    } catch (uploadError) {
+      console.error("Firestore upload record failed", uploadError);
+      return NextResponse.json(
+        { message: "Photo could not be saved. Check Firestore rules for the newsletter_uploads collection." },
+        { status: 500 }
+      );
+    }
   }
 }

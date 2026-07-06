@@ -1210,14 +1210,21 @@ function DropZone({ label, value, onChange }: { label: string; value: string; on
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    const response = await fetch("/api/uploads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl, folder: "newsletter-images" })
-    });
-    const payload = await response.json();
-    onChange(payload.url ?? dataUrl);
+    try {
+      const dataUrl = await compressImageToDataUrl(file);
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl, folder: "newsletter-images" })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.message ?? "Photo upload failed. Please try a smaller image.");
+      }
+      onChange(payload.url);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Photo upload failed. Please try again.");
+    }
   }
 
   return (
@@ -1348,6 +1355,45 @@ function getReadiness(issue: NewsletterIssue, submissions: Submission[], departm
 function formatDate(value: string) {
   if (!value) return "not set";
   return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+async function compressImageToDataUrl(file: File) {
+  const attempts = [
+    { maxSize: 1400, quality: 0.72 },
+    { maxSize: 1000, quality: 0.62 },
+    { maxSize: 760, quality: 0.54 }
+  ];
+  let best = await fileToDataUrl(file);
+
+  for (const attempt of attempts) {
+    const compressed = await resizeImage(file, attempt.maxSize, attempt.quality);
+    best = compressed.length < best.length ? compressed : best;
+    if (best.length < 760_000) return best;
+  }
+
+  return best;
+}
+
+function resizeImage(file: File, maxSize: number, quality: number) {
+  return new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        reject(new Error("Could not prepare image for upload."));
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+      URL.revokeObjectURL(image.src);
+    };
+    image.onerror = () => reject(new Error("Could not read this image."));
+    image.src = URL.createObjectURL(file);
+  });
 }
 
 function fileToDataUrl(file: File) {
