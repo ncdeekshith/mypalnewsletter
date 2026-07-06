@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const imageSchema = z.object({
   id: z.string().optional(),
-  url: z.string().min(10, "Upload a photo or use a valid image URL"),
-  caption: z.string().min(1, "Caption is required")
+  url: z.string().default(""),
+  caption: z.string().default("")
 });
 
 export const submissionSchema = z.object({
@@ -11,11 +11,11 @@ export const submissionSchema = z.object({
   issueId: z.string(),
   userId: z.string(),
   departmentId: z.string(),
-  sectionTitle: z.string().min(2),
-  headline: z.string().min(6, "Headline is required"),
-  intro: z.string().min(20, "Add a short introduction"),
-  bullets: z.array(z.string().min(5)).min(3, "Add at least 3 bullet updates"),
-  metrics: z.array(z.object({ label: z.string().min(1), value: z.string().min(1) })).default([]),
+  sectionTitle: z.string().default("Team Update"),
+  headline: z.string().default(""),
+  intro: z.string().default(""),
+  bullets: z.array(z.string()).default([]),
+  metrics: z.array(z.object({ label: z.string(), value: z.string() })).default([]),
   images: z.array(imageSchema).default([]),
   status: z.enum(["draft", "submitted", "approved", "rejected", "published"]).default("draft"),
   visible: z.boolean().default(true),

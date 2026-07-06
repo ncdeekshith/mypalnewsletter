@@ -397,7 +397,7 @@ function SubmissionForm({
       intro: form.intro,
       bullets: form.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
       metrics: form.metrics.split("\n").map((item) => item.trim()).filter(Boolean).map(metricFromLine),
-      images: form.images.filter((image) => image.url && image.caption),
+      images: form.images.filter((image) => image.url),
       status,
       visible: true,
       sortOrder: selectedDepartment?.sortOrder ?? 10,
@@ -413,7 +413,7 @@ function SubmissionForm({
     if (!response.ok) {
       const data = await response.json().catch(() => null);
       setSavingStatus(null);
-      setError(formatSubmissionError(data) || "Please include an intro and at least 3 bullet points. Photos are optional.");
+      setError(formatSubmissionError(data) || "Could not save this update. Please try again.");
       return;
     }
 
@@ -447,7 +447,7 @@ function SubmissionForm({
       </div>
       <Field label="Main update headline" value={form.headline} onChange={(value) => setForm({ ...form, headline: value })} />
       <TextArea label="Short description / introduction" value={form.intro} onChange={(value) => setForm({ ...form, intro: value })} rows={4} />
-      <TextArea label="Bullet-point achievements" hint="One bullet per line, minimum 3." value={form.bullets} onChange={(value) => setForm({ ...form, bullets: value })} rows={6} />
+      <TextArea label="Bullet-point achievements" hint="One update per line. Optional." value={form.bullets} onChange={(value) => setForm({ ...form, bullets: value })} rows={6} />
       <TextArea label="Metrics" hint="One per line, format: Students reached: 1240" value={form.metrics} onChange={(value) => setForm({ ...form, metrics: value })} rows={4} />
 
       <div className="mt-6">
@@ -694,7 +694,7 @@ function CustomSectionCreator({ issue, user, submissions, onCreated }: { issue: 
     });
 
     if (!response.ok) {
-      setMessage("Add a title, headline, intro, and at least 3 bullet lines.");
+      setMessage("Could not add this section. Please try again.");
       return;
     }
 
@@ -1318,10 +1318,6 @@ function getReadiness(issue: NewsletterIssue, submissions: Submission[], departm
     const submission = submissions.find((item) => item.departmentId === department.id);
     if (!submission || submission.status === "draft") blockers.push(`${department.name} has not submitted a final update.`);
     if (submission && !["approved", "published"].includes(submission.status)) blockers.push(`${department.name} is not approved yet.`);
-  });
-
-  visibleSubmissions.forEach((submission) => {
-    if (submission.bullets.length < 3) blockers.push(`${submission.sectionTitle} needs at least 3 bullet updates.`);
   });
 
   if (!issue.dueDate) blockers.push("Submission due date is not set.");
