@@ -116,6 +116,17 @@ export default function DashboardPage() {
     await loadAll();
   }
 
+  async function deleteSubmission(id: string) {
+    const response = await fetch(`/api/submissions/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.message ?? "Could not delete section.");
+      return;
+    }
+    setMessage("Section deleted.");
+    await loadAll();
+  }
+
   async function patchIssue(patch: Partial<NewsletterIssue>) {
     await fetch(`/api/issues/${issue?.id}`, {
       method: "PATCH",
@@ -230,7 +241,7 @@ export default function DashboardPage() {
             <SubmissionForm user={user} issue={issue} departments={bootstrap.departments} defaultDepartment={activeDepartment} submissions={submissions} onSaved={() => loadAll()} />
           ) : null}
           {activeTab === "review" && admin ? (
-            <ReviewBoard issue={issue} user={user} submissions={submissions} departments={bootstrap.departments} onPatch={patchSubmission} onCreated={() => loadAll()} generatedPdfs={bootstrap.generatedPdfs} />
+            <ReviewBoard issue={issue} user={user} submissions={submissions} departments={bootstrap.departments} onPatch={patchSubmission} onDelete={deleteSubmission} onCreated={() => loadAll()} generatedPdfs={bootstrap.generatedPdfs} />
           ) : null}
           {activeTab === "design" && admin ? (
             <DesignStudio issue={issue} settings={bootstrap.settings} submissions={submissions} onPatch={patchSubmission} onSettingsSaved={() => loadAll()} />
@@ -515,6 +526,7 @@ function ReviewBoard({
   submissions,
   departments,
   onPatch,
+  onDelete,
   onCreated,
   generatedPdfs
 }: {
@@ -523,6 +535,7 @@ function ReviewBoard({
   submissions: Submission[];
   departments: Department[];
   onPatch: (id: string, patch: Partial<Submission>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onCreated: () => Promise<void>;
   generatedPdfs: { id: string; fileName: string; fileUrl: string; createdAt: string }[];
 }) {
@@ -583,6 +596,11 @@ function ReviewBoard({
                   <button disabled={Boolean(busyAction)} onClick={() => act(submission.id, { status: "rejected" }, "reject")} className="flex items-center gap-2 rounded bg-rose-600 px-3 py-2 text-sm font-black text-white disabled:opacity-60" aria-label="Reject">
                     <XCircle size={18} /> {busyAction === `${submission.id}-reject` ? "Rejecting..." : "Reject"}
                   </button>
+                  {(submission.status !== "approved" || !submission.visible) ? (
+                    <button type="button" disabled={Boolean(busyAction)} onClick={() => onDelete(submission.id)} className="flex items-center gap-2 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-black text-rose-700 disabled:opacity-60" aria-label="Delete section">
+                      <Trash2 size={18} /> Delete
+                    </button>
+                  ) : null}
                   <input type="number" defaultValue={submission.sortOrder} onBlur={(event) => onPatch(submission.id, { sortOrder: Number(event.target.value) })} className="w-16 rounded border border-orange-200 px-2 text-sm" aria-label="Sort order" />
                 </div>
               </div>
@@ -1234,7 +1252,7 @@ function SettingsForm({ settings, onSaved, compact = false }: { settings: AdminS
         <Field label="Footer text" value={form.footerText} onChange={(value) => setForm({ ...form, footerText: value })} />
         <Field label="Website link" value={form.websiteUrl} onChange={(value) => setForm({ ...form, websiteUrl: value })} />
         <Field label="Social media handle" value={form.socialHandle} onChange={(value) => setForm({ ...form, socialHandle: value })} />
-        <Field label="QR code image URL" value={form.qrCodeUrl} onChange={(value) => setForm({ ...form, qrCodeUrl: value })} />
+        <SingleImageUpload label="QR code image" value={form.qrCodeUrl} onChange={(value) => setForm({ ...form, qrCodeUrl: value })} />
       </div>
       <TextArea label="Clickable social links" hint="One per line. Format: Instagram: https://..." value={socialLines} onChange={setSocialLines} rows={compact ? 4 : 5} />
 
