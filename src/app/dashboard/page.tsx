@@ -148,11 +148,15 @@ export default function DashboardPage() {
     const data = await response.json();
     setGenerating(false);
     if (!response.ok) {
-      setMessage(data.message ?? "Could not generate PDF.");
+      setMessage(data.details ? `${data.message ?? "Could not generate PDF."} ${data.details}` : data.message ?? "Could not generate PDF.");
       return;
     }
     setMessage("PDF generated successfully.");
-    window.open(data.pdf.fileUrl, "_blank");
+    if (data.pdf.base64) {
+      window.open(pdfObjectUrl(data.pdf.base64), "_blank");
+    } else {
+      window.open(data.pdf.fileUrl, "_blank");
+    }
     await loadAll();
   }
 
@@ -1401,6 +1405,15 @@ function departmentName(departments: Department[], id: string) {
 
 function teamDepartments(departments: Department[]) {
   return departments.filter((department) => department.id !== "leadership");
+}
+
+function pdfObjectUrl(base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
 }
 
 function getReadiness(issue: NewsletterIssue, submissions: Submission[], departments: Department[]) {

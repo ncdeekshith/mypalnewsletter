@@ -6,6 +6,8 @@ import { addGeneratedPdf, readDatabase } from "@/lib/store";
 import { fileSafeNewsletterName } from "@/lib/utils";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const { issueId } = (await request.json()) as { issueId?: string };
@@ -21,59 +23,89 @@ export async function POST(request: Request) {
   const fileName = fileSafeNewsletterName(issue.month, issue.year, issue.issueNumber);
   const outputDir = path.join(process.cwd(), "public", "generated");
   const outputPath = path.join(outputDir, fileName);
+  const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) && process.platform === "linux";
 
-  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  let pdfBuffer: Buffer;
   try {
-    await fs.mkdir(outputDir, { recursive: true });
-    browser = await launchChromium();
-    const page = await browser.newPage({ viewport: { width: 1240, height: 1754 }, deviceScaleFactor: 2 });
-    await page.goto(`${origin}/preview/print?issueId=${issue.id}`, { waitUntil: "networkidle" });
-    await page.emulateMedia({ media: "print" });
-    await page.pdf({
-      path: outputPath,
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" }
-    });
+    pdfBuffer = serverless
+      ? await createPdfWithPuppeteer(`${origin}/preview/print?issueId=${issue.id}`)
+      : await createPdfWithPlaywright(`${origin}/preview/print?issueId=${issue.id}`);
   } catch (error) {
-    if (browser) await browser.close().catch(() => undefined);
     return NextResponse.json(
       {
-        message: "PDF generation failed. Chromium could not start on this environment.",
+        message: "PDF generation failed. Chromium could not render this newsletter.",
         details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     );
-  } finally {
-    if (browser) await browser.close().catch(() => undefined);
   }
 
-  const pdf = await addGeneratedPdf({
-    issueId: issue.id,
-    fileName,
-    fileUrl: `/generated/${fileName}`
-  });
+  if (serverless) {
+    return NextResponse.json({
+      pdf: {
+        issueId: issue.id,
+        fileName,
+        fileUrl: "",
+        base64: pdfBuffer.toString("base64"),
+        createdAt: new Date().toISOString()
+      }
+    });
+  }
+
+  await fs.mkdir(outputDir, { recursive: true });
+  await fs.writeFile(outputPath, pdfBuffer);
+
+  const pdf = await addGeneratedPdf({ issueId: issue.id, fileName, fileUrl: `/generated/${fileName}` });
 
   return NextResponse.json({ pdf });
 }
 
-async function launchChromium() {
-  const localArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
+async function createPdfWithPlaywright(url: string) {
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+    const page = await browser.newPage({ viewport: { width: 1240, height: 1754 }, deviceScaleFactor: 2 });
+    await page.goto(url, { waitUntil: "networkidle" });
+    await page.emulateMedia({ media: "print" });
+    return await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" }
+    });
+  } finally {
+    if (browser) await browser.close().catch(() => undefined);
+  }
+}
+
+async function createPdfWithPuppeteer(url: string) {
+  const [{ default: serverlessChromium }, puppeteer] = await Promise.all([
+    import("@sparticuz/chromium"),
+    import("puppeteer-core")
+  ]);
+  const executablePath = await serverlessChromium.executablePath();
+  if (!executablePath) throw new Error("Serverless Chromium executable path was not found.");
+
+  const browser = await puppeteer.launch({
+    args: [...serverlessChromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+    defaultViewport: { width: 1240, height: 1754, deviceScaleFactor: 2 },
+    executablePath,
+    headless: true
+  });
 
   try {
-    return await chromium.launch({
-      headless: true,
-      args: localArgs
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
+    await page.emulateMediaType("print");
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0mm", right: "0mm", bottom: "0mm", left: "0mm" }
     });
-  } catch (localError) {
-    const serverlessChromium = await import("@sparticuz/chromium");
-    const executablePath = await serverlessChromium.default.executablePath();
-    if (!executablePath) throw localError;
-
-    return chromium.launch({
-      executablePath,
-      headless: true,
-      args: [...serverlessChromium.default.args, ...localArgs]
-    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close().catch(() => undefined);
   }
 }
