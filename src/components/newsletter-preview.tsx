@@ -186,7 +186,7 @@ function SectionPage({
   const imageFitClass = options.imageFit === "cover" ? "object-cover" : "object-contain";
   const topGridClass = hero && !continuation ? "grid grid-cols-[1fr_300px] gap-6" : "grid gap-4";
   const sectionGap = compact ? "mt-3" : airy ? "mt-7" : "mt-5";
-  const textOnly = !submission.images.length;
+  const textOnlyPage = chunk.images.length === 0;
 
   return (
     <Page>
@@ -195,7 +195,7 @@ function SectionPage({
         <div className={topGridClass}>
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-mypal-orange">{submission.departmentId.replace("custom-", "custom")}</p>
-            <h2 className="mt-2 text-3xl font-black leading-tight text-[#2a211d]">{submission.sectionTitle}{continuation ? " continued" : ""}</h2>
+            <h2 className={`mt-2 font-black leading-tight text-[#2a211d] ${continuation && textOnlyPage ? "text-2xl" : "text-3xl"}`}>{submission.sectionTitle}{continuation ? " continued" : ""}</h2>
             {!continuation && submission.headline ? <h3 className={compact ? "mt-2 text-lg font-black leading-snug text-[#2a211d]" : "mt-3 text-xl font-black leading-snug text-[#2a211d]"}>{submission.headline}</h3> : null}
             {chunk.intro ? <p className={`${compact ? "mt-3 text-[13px] leading-5" : "mt-4 text-[14px] leading-6"} whitespace-pre-line text-slate-700`}>{chunk.intro}</p> : null}
           </div>
@@ -223,9 +223,9 @@ function SectionPage({
         {chunk.bullets.length ? (
           <div className={sectionGap}>
             <h4 className={`${compact ? "mb-2" : "mb-3"} text-base font-black text-[#2a211d]`}>Key updates</h4>
-            <ul className={`grid ${textOnly && chunk.bullets.length > 5 ? "grid-cols-2" : ""} ${compact ? "gap-1.5" : "gap-2"}`}>
+            <ul className={`grid ${textOnlyPage && chunk.bullets.length > 4 ? "grid-cols-2" : ""} ${compact || textOnlyPage ? "gap-1.5" : "gap-2"}`}>
               {chunk.bullets.map((bullet) => (
-                <li key={bullet} className={`flex gap-3 rounded border border-orange-100 bg-white ${textOnly ? "p-2 text-[12px] leading-4" : compact ? "p-2 text-[12px] leading-4" : "p-3 text-[13px] leading-5"} font-semibold text-slate-700`}>
+                <li key={bullet} className={`flex gap-3 rounded border border-orange-100 bg-white ${textOnlyPage ? "p-2 text-[12px] leading-4" : compact ? "p-2 text-[12px] leading-4" : "p-3 text-[13px] leading-5"} font-semibold text-slate-700`}>
                   <span className="mt-2 h-2 w-2 flex-none rounded-full bg-mypal-orange" />
                   <span>{bullet}</span>
                 </li>
@@ -309,16 +309,30 @@ function buildSectionChunks(submission: Submission): SectionChunk[] {
   const compact = options.spacing === "compact";
   const airy = options.spacing === "airy";
   const introChunks = chunkWords(submission.intro, hasImages ? (compact ? 115 : airy ? 70 : 90) : (compact ? 240 : airy ? 150 : 190));
-  const bulletChunks = chunkArray(submission.bullets, hasImages ? (compact ? 6 : airy ? 3 : 4) : (compact ? 24 : airy ? 12 : 18));
   const imageChunks = chunkArray(submission.images, compact ? 4 : 3);
-  const pageCount = Math.max(1, introChunks.length, bulletChunks.length, imageChunks.length);
+  const chunks: SectionChunk[] = [];
+  let bulletIndex = 0;
+  let pageIndex = 0;
 
-  return Array.from({ length: pageCount }, (_, index) => ({
-    intro: introChunks[index] ?? "",
-    bullets: bulletChunks[index] ?? [],
-    metrics: index === 0 ? submission.metrics.slice(0, 3) : [],
-    images: imageChunks[index] ?? []
-  }));
+  while (pageIndex < introChunks.length || pageIndex < imageChunks.length || bulletIndex < submission.bullets.length) {
+    const images = imageChunks[pageIndex] ?? [];
+    const pageHasImages = images.length > 0;
+    const bulletLimit = pageHasImages
+      ? (compact ? 6 : airy ? 3 : 4)
+      : (compact ? 24 : airy ? 12 : 18);
+
+    chunks.push({
+      intro: introChunks[pageIndex] ?? "",
+      bullets: submission.bullets.slice(bulletIndex, bulletIndex + bulletLimit),
+      metrics: pageIndex === 0 ? submission.metrics.slice(0, 3) : [],
+      images
+    });
+
+    bulletIndex += bulletLimit;
+    pageIndex += 1;
+  }
+
+  return chunks.length ? chunks : [{ intro: "", bullets: [], metrics: [], images: [] }];
 }
 
 function getPdfOptions(submission: Submission) {
