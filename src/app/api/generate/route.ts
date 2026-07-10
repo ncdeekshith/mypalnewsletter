@@ -82,17 +82,23 @@ async function createPdfWithPlaywright(url: string) {
 
 async function createPdfWithPuppeteer(url: string) {
   const [{ default: serverlessChromium }, puppeteer] = await Promise.all([
-    import("@sparticuz/chromium"),
+    import("@sparticuz/chromium-min"),
     import("puppeteer-core")
   ]);
-  const executablePath = await serverlessChromium.executablePath();
+  const chromiumPackUrl =
+    process.env.CHROMIUM_PACK_URL ??
+    "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.tar";
+  const executablePath = await serverlessChromium.executablePath(chromiumPackUrl);
   if (!executablePath) throw new Error("Serverless Chromium executable path was not found.");
 
   const browser = await puppeteer.launch({
-    args: [...serverlessChromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+    args: await puppeteer.defaultArgs({
+      args: [...serverlessChromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+      headless: "shell"
+    }),
     defaultViewport: { width: 1240, height: 1754, deviceScaleFactor: 2 },
     executablePath,
-    headless: true
+    headless: "shell"
   });
 
   try {

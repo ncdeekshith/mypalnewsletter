@@ -184,9 +184,11 @@ function SectionPage({
   const compact = options.spacing === "compact";
   const airy = options.spacing === "airy";
   const imageFitClass = options.imageFit === "cover" ? "object-cover" : "object-contain";
-  const topGridClass = hero && !continuation ? "grid grid-cols-[1fr_300px] gap-6" : "grid gap-4";
-  const sectionGap = compact ? "mt-3" : airy ? "mt-7" : "mt-5";
+  const topGridClass = hero && !continuation ? "grid grid-cols-[1fr_286px] items-start gap-6" : "grid gap-3";
+  const sectionGap = compact ? "mt-3" : airy ? "mt-6" : "mt-4";
   const textOnlyPage = chunk.images.length === 0;
+  const denseBullets = textOnlyPage || chunk.bullets.length > 5;
+  const galleryOnly = continuation && !chunk.intro && !chunk.bullets.length && !chunk.metrics.length && chunk.images.length > 0;
 
   return (
     <Page>
@@ -196,12 +198,13 @@ function SectionPage({
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.22em] text-mypal-orange">{submission.departmentId.replace("custom-", "custom")}</p>
             <h2 className={`mt-2 font-black leading-tight text-[#2a211d] ${continuation && textOnlyPage ? "text-2xl" : "text-3xl"}`}>{submission.sectionTitle}{continuation ? " continued" : ""}</h2>
+            {galleryOnly ? <p className="mt-3 max-w-lg text-sm font-semibold leading-6 text-slate-600">Additional visuals from this team update.</p> : null}
             {!continuation && submission.headline ? <h3 className={compact ? "mt-2 text-lg font-black leading-snug text-[#2a211d]" : "mt-3 text-xl font-black leading-snug text-[#2a211d]"}>{submission.headline}</h3> : null}
             {chunk.intro ? <p className={`${compact ? "mt-3 text-[13px] leading-5" : "mt-4 text-[14px] leading-6"} whitespace-pre-line text-slate-700`}>{chunk.intro}</p> : null}
           </div>
           {hero && !continuation ? (
-            <figure className="rounded bg-[#fff8f1] p-2 shadow-soft">
-              <div className="grid h-56 w-full place-items-center overflow-hidden rounded bg-white">
+            <figure className="self-start rounded bg-[#fff8f1] p-2 shadow-soft">
+              <div className="grid h-48 w-full place-items-center overflow-hidden rounded bg-white">
                 <img src={hero.url} alt={hero.caption || submission.sectionTitle} className={`max-h-full max-w-full ${imageFitClass}`} />
               </div>
               <ImageCaption caption={hero.caption} />
@@ -223,10 +226,10 @@ function SectionPage({
         {chunk.bullets.length ? (
           <div className={sectionGap}>
             <h4 className={`${compact ? "mb-2" : "mb-3"} text-base font-black text-[#2a211d]`}>Key updates</h4>
-            <ul className={`grid ${textOnlyPage && chunk.bullets.length > 4 ? "grid-cols-2" : ""} ${compact || textOnlyPage ? "gap-1.5" : "gap-2"}`}>
+            <ul className={`grid ${denseBullets && chunk.bullets.length > 4 ? "grid-cols-2" : ""} ${denseBullets ? "gap-1.5" : compact ? "gap-1.5" : "gap-2"}`}>
               {chunk.bullets.map((bullet) => (
-                <li key={bullet} className={`flex gap-3 rounded border border-orange-100 bg-white ${textOnlyPage ? "p-2 text-[12px] leading-4" : compact ? "p-2 text-[12px] leading-4" : "p-3 text-[13px] leading-5"} font-semibold text-slate-700`}>
-                  <span className="mt-2 h-2 w-2 flex-none rounded-full bg-mypal-orange" />
+                <li key={bullet} className={`flex break-inside-avoid gap-3 rounded border border-orange-100 bg-white ${denseBullets ? "p-2.5 text-[12px] leading-4" : compact ? "p-2.5 text-[12px] leading-4" : "p-3 text-[13px] leading-5"} font-semibold text-slate-700`}>
+                  <span className="mt-1.5 h-2 w-2 flex-none rounded-full bg-mypal-orange" />
                   <span>{bullet}</span>
                 </li>
               ))}
@@ -235,10 +238,10 @@ function SectionPage({
         ) : null}
 
         {chunk.images.slice(hero && !continuation ? 1 : 0).length ? (
-          <div className={`${sectionGap} grid grid-cols-2 gap-3`}>
+          <div className={`${galleryOnly ? "mt-8" : sectionGap} grid ${galleryOnly && chunk.images.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
             {chunk.images.slice(hero && !continuation ? 1 : 0).map((image) => (
-              <figure key={image.id} className="rounded bg-[#fff8f1] p-2">
-                <div className="grid h-36 w-full place-items-center overflow-hidden rounded bg-white">
+              <figure key={image.id} className="self-start rounded bg-[#fff8f1] p-2">
+                <div className={`grid w-full place-items-center overflow-hidden rounded bg-white ${galleryOnly ? "h-80" : "h-32"}`}>
                   <img src={image.url} alt={image.caption || submission.sectionTitle} className={`max-h-full max-w-full ${imageFitClass}`} />
                 </div>
                 <ImageCaption caption={image.caption} />
@@ -308,21 +311,27 @@ function buildSectionChunks(submission: Submission): SectionChunk[] {
   const options = getPdfOptions(submission);
   const compact = options.spacing === "compact";
   const airy = options.spacing === "airy";
-  const introChunks = chunkWords(submission.intro, hasImages ? (compact ? 115 : airy ? 70 : 90) : (compact ? 240 : airy ? 150 : 190));
-  const imageChunks = chunkArray(submission.images, compact ? 4 : 3);
+  const introChunks = chunkWords(submission.intro, hasImages ? (compact ? 135 : airy ? 85 : 110) : (compact ? 320 : airy ? 230 : 270));
+  const imageChunks =
+    submission.images.length > 1 && submission.bullets.length > 6
+      ? [[submission.images[0]], ...chunkArray(submission.images.slice(1), compact ? 5 : 4)]
+      : chunkArray(submission.images, compact ? 5 : 4);
   const chunks: SectionChunk[] = [];
   let bulletIndex = 0;
   let pageIndex = 0;
 
   while (pageIndex < introChunks.length || pageIndex < imageChunks.length || bulletIndex < submission.bullets.length) {
     const images = imageChunks[pageIndex] ?? [];
-    const pageHasImages = images.length > 0;
-    const bulletLimit = pageHasImages
-      ? (compact ? 6 : airy ? 3 : 4)
-      : (compact ? 24 : airy ? 12 : 18);
+    const intro = introChunks[pageIndex] ?? "";
+    const bulletLimit = getBulletLimit({
+      intro,
+      imageCount: images.length,
+      hasMetrics: pageIndex === 0 && submission.metrics.length > 0,
+      spacing: options.spacing
+    });
 
     chunks.push({
-      intro: introChunks[pageIndex] ?? "",
+      intro,
       bullets: submission.bullets.slice(bulletIndex, bulletIndex + bulletLimit),
       metrics: pageIndex === 0 ? submission.metrics.slice(0, 3) : [],
       images
@@ -333,6 +342,29 @@ function buildSectionChunks(submission: Submission): SectionChunk[] {
   }
 
   return chunks.length ? chunks : [{ intro: "", bullets: [], metrics: [], images: [] }];
+}
+
+function getBulletLimit({
+  intro,
+  imageCount,
+  hasMetrics,
+  spacing
+}: {
+  intro: string;
+  imageCount: number;
+  hasMetrics: boolean;
+  spacing: NonNullable<Submission["pdfOptions"]>["spacing"];
+}) {
+  const introWords = intro.split(/\s+/).filter(Boolean).length;
+  const imageCost = imageCount === 0 ? 0 : imageCount === 1 ? 1 : 4 + imageCount;
+  const metricsCost = hasMetrics ? 1 : 0;
+  const introCost = Math.ceil(introWords / 50);
+  const baseCapacity = spacing === "compact" ? 18 : spacing === "airy" ? 11 : 15;
+  const limit = baseCapacity - imageCost - metricsCost - introCost;
+
+  if (imageCount === 0) return Math.max(spacing === "airy" ? 10 : 12, limit);
+  if (imageCount === 1) return Math.max(spacing === "airy" ? 7 : 11, limit);
+  return Math.max(spacing === "airy" ? 5 : 7, limit);
 }
 
 function getPdfOptions(submission: Submission) {
